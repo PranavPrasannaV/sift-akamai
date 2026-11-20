@@ -140,6 +140,9 @@ Known limits:
     still reads and sends the email; Sift never sends it.
   - The FSIS corpus is hand-authored, because FSIS returns 403 to scripts. It is
     labelled that way on every screen.
+  - The live recall refresh does not reach openFDA from the Linode: openFDA
+    answers 403 to that server. Sift falls back to the dated snapshot
+    (2026-09-05, 1,000 records), says so on screen, and marks the corpus stale.
   - There are no user accounts. The person recording a decision types their
     name.
   - The original Sift could run with no network. This deployment needs its
