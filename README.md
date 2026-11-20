@@ -15,7 +15,7 @@ against every line. This repository runs Sift on **Akamai Cloud**:
 - Akamai Inference (three models) does the work no rule can: it reads labels,
   orders what to look at first, and drafts the distributor email.
 
-**Live:** `http://172.234.240.147` (Linode `sea-dev-web`, Seattle). `/health` shows each service connected. The Cloud Firewall currently admits only our own address, so the video is the public demo.
+**Live:** `http://172.234.240.147` (Linode `sea-dev-web`, Seattle). `/health` shows each service connected. Open to anyone on port 80.
 
 **The rule the whole thing is built around:** under-pulling risks a child, and
 over-pulling only wastes a case of tomatoes.
@@ -43,8 +43,8 @@ Benefit: The inventory export the kitchen already produces becomes a pull sheet
 
 Services:
   - Linode (Nanode, Seattle) runs the FastAPI app under systemd on port 80, with
-    the folder watcher in the same process. Cloud Firewall sea-dev-fw allows only
-    ports 22 and 80, and only from our address.
+    the folder watcher in the same process. Cloud Firewall sea-dev-fw opens port 80 to
+    everyone and port 22 (SSH) only to our own address.
   - Managed PostgreSQL 19 (Seattle) is the system of record: all 10 Sift tables
     (runs, matches, decisions, recall corpus, menu), the same CHECK constraints,
     and nothing ever deleted. The same database stores pgvector embeddings of
