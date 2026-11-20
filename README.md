@@ -42,8 +42,12 @@ Benefit: The inventory export the kitchen already produces becomes a pull sheet
   - the distributor notice is drafted with every number traced back to the data.
 
 Services:
-  - Linode (Nanode, Seattle) runs the FastAPI app under systemd on port 80, with
-    the folder watcher in the same process. Cloud Firewall sea-dev-fw opens port 80 to
+  - Linode (Nanode, Seattle) runs two systemd services:
+    - sift-web: Sift's original Next.js dashboard on port 80, the only public
+      port. It proxies /api/v1 and the AI pages to the Python process on the
+      same machine.
+    - sift: the FastAPI API, matcher and folder watcher, on 127.0.0.1:8000.
+    Cloud Firewall sea-dev-fw opens port 80 to
     everyone and port 22 (SSH) only to our own address.
   - Managed PostgreSQL 19 (Seattle) is the system of record: all 10 Sift tables
     (runs, matches, decisions, recall corpus, menu), the same CHECK constraints,
@@ -107,17 +111,20 @@ Our idea: Recall tools either alert you or clear things for you. Sift does
   line. The AI here is pointed at the cost of that safety, which is a long held
   list. It decides the reading order of the list, not its contents.
 
-Demo: Upload data/fixtures/inventory_lincoln.csv on "Add inventory" and the pull
-  sheet appears. Then:
-  - Open "Run history", then the run, to see the original file in Object Storage.
+Demo: On the dashboard, upload data/fixtures/inventory_lincoln.csv with the +
+  button. The page fills in: 42 items to pull, with both USDA clocks running.
+  Then:
+  - Open the sheet, then a line, to see both records verbatim.
   - Upload data/demo/inventory_lincoln_day2.csv, which is the same export plus
     one unbranded chickpea dip.
-  - Open "Held: read first" to see the turkey breast and the chickpea dip at the
-    top, out of 827 held lines.
-  - Open "Check a label" and upload data/demo/case_label_hummus.png: the barcode
+  - Go to /ai/triage ("Held: read first") to see the turkey breast and the
+    chickpea dip at the top, out of 827 held lines.
+  - Go to /ai/label and upload data/demo/case_label_hummus.png: the barcode
     matches the Class I Sabra recall.
-  - Open "Distributor notice" and draft it: the drafts come back with the
-    numbers checked.
+  - Go to /ai/notice and draft it: the drafts come back with the numbers
+    checked.
+  - Go to /files/run/1: the original export opens from Object Storage through
+    a presigned linodeobjects.com link that expires in an hour.
 
 Known limits:
   - The AI pages call the model on first view. "Held: read first" took about
@@ -131,8 +138,13 @@ Known limits:
     name.
   - The original Sift could run with no network. This deployment needs its
     database. SQLite mode still exists for an offline kitchen.
-  - The Next.js dashboard in web/ was not deployed. The server-rendered app is
-    the one live.
+  - The dashboard is Sift's original UI, unchanged. The AI pages are separate
+    server-rendered pages under /ai/ and are not linked from the dashboard's
+    menu. Each run's original file is at /files/run/<id>, which the dashboard
+    does not link to either.
+  - We fixed one bug carried over from the original: the dashboard's upload
+    path expected two values from the column check and got three, so every
+    dashboard upload was refused.
 ```
 
 ### Where each service is in the code
@@ -145,7 +157,7 @@ Known limits:
 | Inference: embeddings and chat | `pullsheet/akamai/semantic.py`, `pullsheet/akamai/inference.py` | `/ai/triage`, `/ai/second-look` |
 | Inference: chat | `pullsheet/akamai/notice.py` | `/ai/notice`: drafts, then checks every number |
 | Inference: vision | `pullsheet/akamai/vision.py` | `/ai/label`: reads a case label photo |
-| Linode | `deploy/sift.service`, `deploy/deploy.sh` | systemd service on port 80 |
+| Linode | `deploy/sift-web.service`, `deploy/sift.service`, `deploy/deploy.sh` | Dashboard on port 80, API on 127.0.0.1:8000 |
 
 ## Run it
 
@@ -159,7 +171,11 @@ cp .env.example .env        # fill in the Akamai values
 Leave out the `PG` lines in `.env` and Sift uses a local SQLite file. Leave out
 `OBJ_BUCKET` and it does not archive.
 
+The dashboard runs with `cd web && npm install && npm run dev` (port 3000). It
+proxies `/api/v1` to the Python process on port 8000.
+
 To deploy to a Linode with `uv` installed, run `IP=<linode-ip> bash deploy/deploy.sh`.
+It builds the dashboard locally and installs Node on the Linode.
 
 Checks against the real services:
 

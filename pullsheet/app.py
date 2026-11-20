@@ -555,3 +555,13 @@ try:  # the AI features (Akamai inference): second look, distributor notice
 except ImportError as _error:  # pragma: no cover
     import logging
     logging.getLogger(__name__).warning("AI routes not loaded: %s", _error)
+
+
+@app.get("/files/run/{run_id}")
+def run_original_file(run_id: int):
+    """The original export a run read, straight from Akamai Object Storage
+    through a presigned link that expires in an hour."""
+    files = storage.exports_for_run(run_id)
+    if not files:
+        raise HTTPException(404, "No archived file for this run.")
+    return RedirectResponse(files[0]["url"], status_code=303)

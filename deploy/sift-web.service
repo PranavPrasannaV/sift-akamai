@@ -1,0 +1,17 @@
+[Unit]
+Description=Sift dashboard (Next.js), the public face on port 80
+After=network-online.target sift.service
+Wants=sift.service
+
+[Service]
+WorkingDirectory=/root/sift-web
+Environment=PORT=80
+Environment=HOSTNAME=0.0.0.0
+Environment=SIFT_API_INTERNAL=http://127.0.0.1:8000
+Environment=NODE_ENV=production
+ExecStart=/opt/node/bin/node server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

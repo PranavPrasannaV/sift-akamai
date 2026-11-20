@@ -1,12 +1,12 @@
 [Unit]
-Description=Sift recall pull sheets on Akamai Cloud
+Description=Sift API, matcher and folder watcher (behind the dashboard)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 WorkingDirectory=/root/sift
 EnvironmentFile=/root/sift/.env
-ExecStart=/root/sift/.venv/bin/python -m pullsheet.main --host 0.0.0.0 --port 80
+ExecStart=/root/sift/.venv/bin/python -m pullsheet.main --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=3
 

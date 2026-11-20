@@ -694,7 +694,7 @@ async def api_ingest_upload(file: UploadFile) -> dict[str, Any]:
     try:
         at = app.now()
         try:
-            mapping, ambiguous = app._resolve(conn, adapter, target)
+            _headers, mapping, ambiguous = app._resolve(conn, adapter, target)
         except Exception as err:                                     # noqa: BLE001
             # A file whose headings cannot even be read is still a delivery
             # that happened. It becomes a refused run rather than nothing.
@@ -728,7 +728,7 @@ def api_ingest_mapping(payload: MappingAnswer) -> dict[str, Any]:
     conn = app._conn()
     try:
         at = app.now()
-        mapping, ambiguous = app._resolve(conn, adapter, path)
+        _headers, mapping, ambiguous = app._resolve(conn, adapter, path)
         for header in ambiguous:
             chosen = payload.answers.get(header)
             if chosen and chosen != "ignore":

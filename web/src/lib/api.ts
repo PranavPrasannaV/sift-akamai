@@ -18,7 +18,11 @@ export * from "./types";
 
 /** Where the Python side is listening. Nothing else is ever contacted. */
 export const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000"
+  typeof window === "undefined"
+    ? (process.env.SIFT_API_INTERNAL ?? process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000")
+    // In the browser, ask this same origin; next.config.ts proxies /api/v1 to
+    // the Python process. Deployed, only one port is public.
+    : (process.env.NEXT_PUBLIC_API_BASE ?? "")
 ).replace(/\/+$/, "");
 
 /** How often the shell asks /api/v1/status whether the run changed. */
