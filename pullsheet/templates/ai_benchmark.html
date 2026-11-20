@@ -1,0 +1,82 @@
+<title>Benchmark &mdash; {{ LOCATION.name }}</title>
+{% include "base.html" %}
+{% include "ai_style.html" %}
+<style>
+  .bench h2 { margin-top: 2.2rem; }
+  .bench .vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin: 1rem 0 1.4rem; max-width: 52rem; }
+  .bench .card { background: #fff; border: 1px solid var(--line); padding: .9rem 1rem; }
+  .bench .card.new { border-left: 3px solid #5b21b6; }
+  .bench .card h3 { margin: 0 0 .5rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: #555; }
+  .bench .card .big { font-size: 2.1rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .bench .card .big small { font-size: .9rem; font-weight: 500; color: #555; }
+  .bench .card ul { margin: .5rem 0 0; padding-left: 1.1rem; font-size: .88rem; line-height: 1.5; }
+  .bench td.num, .bench th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bench td.best { font-weight: 700; color: #5b21b6; }
+  .bench td.worse { color: var(--pull); }
+  .bench tfoot td { border-top: 2px solid var(--ink); font-weight: 600; }
+  .bench ol.how { max-width: 76ch; line-height: 1.55; }
+</style>
+
+<main class="ai bench">
+  <p class="crumb"><a href="/sheet">&larr; pull sheet</a></p>
+  <h1>Benchmark: baseline against what we built</h1>
+  <p class="ai-tag">Measured on the live Akamai deployment &mdash; scripts/benchmark.py</p>
+  {% if not bench %}
+  <p class="zero">No benchmark has been run yet. Run <code>python -m scripts.benchmark</code>.</p>
+  {% else %}
+  {% set n = bench.notice.summary %}{% set r = bench.ranking %}
+  {% set carrots = [] %}{% for l in r.lines %}{% if 'CARROTS' in l.item %}{% set _ = carrots.append(l) %}{% endif %}{% endfor %}
+  <p class="lede">Run #{{ bench.run_id }}, the demo export, measured {{ bench.generated_at[:16] | replace('T', ' ') }} UTC.
+    Two tasks, each scored against ground truth: the {{ r.seeded_total }} recalled products planted in the fixture, and the pull lines in the database.</p>
+
+  <h2>1. The 24-hour distributor notice</h2>
+  <p class="lede">Baseline: the model writes the whole email from the pull lines, then a checker compares every figure.
+    New: code builds the item table and the request from the database; the model writes only the subject, opening and closing.
+    Both scored by the same checker: {{ n.baseline.drafts }} drafts each, {{ n.baseline.rows }} item rows.</p>
+  <div class="vs">
+    <div class="card"><h3>Baseline: the model writes it all</h3>
+      <div class="big">{{ n.baseline.median_seconds }}<small> s per email (median)</small></div>
+      <ul><li>{{ n.baseline.row_accuracy }}% of item rows correct</li>
+        <li>{{ n.baseline.invented_figures }} figure{{ '' if n.baseline.invented_figures == 1 else 's' }} the model made up</li>
+        <li>{{ n.baseline.clean_drafts }} of {{ n.baseline.drafts }} drafts clean</li></ul></div>
+    <div class="card new"><h3>New: the model writes no data</h3>
+      <div class="big">{{ n.new.median_seconds }}<small> s per email (median)</small></div>
+      <ul><li>{{ n.new.row_accuracy }}% of item rows correct</li>
+        <li>{{ n.new.invented_figures }} figure{{ '' if n.new.invented_figures == 1 else 's' }} the model made up</li>
+        <li>{{ n.new.clean_drafts }} of {{ n.new.drafts }} drafts clean</li></ul></div>
+  </div>
+
+  <h2>2. Which held line to read first</h2>
+  <p class="lede">Of {{ r.seeded_total }} planted recalled products, Sift's rules pull {{ r.seeded_on_sheet - r.true_held }}.
+    {{ r.true_held }} are HELD, hidden among {{ r.held_total }} held lines. The question is how far down the list each one sits. Lower is better.</p>
+  <table class="lines">
+    <thead><tr><th>Recalled product (true match)</th><th>Recall</th>
+      <th class="num">Baseline: sheet order</th><th class="num">Meaning only</th><th class="num">Fused</th><th class="num">Fused + model read</th><th>Model said</th></tr></thead>
+    <tbody>
+    {% for l in r.lines | sort(attribute='reader') %}
+      <tr><td>{{ l.item }}</td><td><code>{{ l.recall }}</code></td>
+        <td class="num">{{ l.baseline }}</td><td class="num">{{ l.vectors }}</td><td class="num">{{ l.fused }}</td>
+        <td class="num {% if l.reader < l.baseline %}best{% elif l.reader > l.baseline %}worse{% endif %}">{{ l.reader }}</td>
+        <td>{% if l.verdict %}<span class="ai-verdict ai-{{ l.verdict }}">{{ l.verdict }}</span>{% else %}<span class="fine">not read</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="2">Median position</td><td class="num">{{ r.baseline.median | int }}</td><td class="num">{{ r.vectors.median | int }}</td>
+        <td class="num">{{ r.fused.median | int }}</td><td class="num best">{{ r.reader.median | int }}</td><td></td></tr>
+      <tr><td colspan="2">In the first 36 (what the model reads)</td><td class="num">{{ r.baseline.in_top_36 }}</td><td class="num">{{ r.vectors.in_top_36 }}</td>
+        <td class="num">{{ r.fused.in_top_36 }}</td><td class="num best">{{ r.reader.in_top_36 }}</td><td></td></tr>
+    </tfoot>
+  </table>
+  {% if carrots %}<p class="fine">Honest misses: the model read the carrots pair as "{{ carrots[0].verdict }}", so it sits at {{ carrots[0].reader }} instead of {{ carrots[0].baseline }}.
+    It is still HELD: a "different" only moves a line down, never clears it.
+    Two products stay deep in the list; neither signal sees them.</p>{% endif %}
+
+  <h2>Techniques applied</h2>
+  <ol class="how">
+    <li><b>Split the work by trust.</b> Code writes every product, quantity, lot and recall number from the database. The model writes only the wording, and a checker flags any digit, code, product name or action word it adds.</li>
+    <li><b>Embeddings in the database.</b> qwen3-embedding-8b vectors for every recall and inventory line, stored in Akamai PostgreSQL with pgvector, so one SQL query ranks every held pair by meaning. Cached, so a re-run embeds nothing it has already seen.</li>
+    <li><b>Reciprocal rank fusion.</b> Meaning alone buried the carrots (7th on the sheet, 380th by meaning). Fusing the two rankings keeps a pair near the top if either signal ranks it high.</li>
+    <li><b>Read the top, cache the verdicts.</b> qwen3-8-27b reads only the first 36 pairs and quotes its reason; verdicts are cached in PostgreSQL. A verdict reorders a line; it never clears one.</li>
+  </ol>
+  {% endif %}
+</main>

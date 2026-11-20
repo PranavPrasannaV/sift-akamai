@@ -1,0 +1,230 @@
+{
+ "generated_at": "2026-11-20T22:13:09+00:00",
+ "run_id": 1,
+ "ranking": {
+  "held_total": 814,
+  "seeded_total": 29,
+  "seeded_on_sheet": 29,
+  "true_held": 5,
+  "seconds": 39.0,
+  "baseline": {
+   "ranks": [
+    7,
+    88,
+    406,
+    407,
+    630
+   ],
+   "median": 406,
+   "mean": 307.6,
+   "in_top_10": 1,
+   "in_top_36": 1,
+   "first": 7
+  },
+  "vectors": {
+   "ranks": [
+    1,
+    87,
+    335,
+    366,
+    380
+   ],
+   "median": 335,
+   "mean": 233.8,
+   "in_top_10": 1,
+   "in_top_36": 1,
+   "first": 1
+  },
+  "fused": {
+   "ranks": [
+    21,
+    28,
+    71,
+    446,
+    533
+   ],
+   "median": 71,
+   "mean": 219.8,
+   "in_top_10": 0,
+   "in_top_36": 2,
+   "first": 21
+  },
+  "reader": {
+   "ranks": [
+    1,
+    28,
+    71,
+    446,
+    533
+   ],
+   "median": 71,
+   "mean": 215.8,
+   "in_top_10": 1,
+   "in_top_36": 2,
+   "first": 1
+  },
+  "lines": [
+   {
+    "item": "TURKEY BREAST SLICED OVEN ROASTED 6 LB",
+    "recall": "FSIS-RC-012-2026",
+    "baseline": 406,
+    "vectors": 1,
+    "fused": 21,
+    "reader": 1,
+    "verdict": "same"
+   },
+   {
+    "item": "CARROTS BABY PEELED FRESH 5 LB",
+    "recall": "F-0359-2025",
+    "baseline": 7,
+    "vectors": 380,
+    "fused": 28,
+    "reader": 28,
+    "verdict": "different"
+   },
+   {
+    "item": "APPLES FRESH 125 CT",
+    "recall": "F-0616-2018",
+    "baseline": 88,
+    "vectors": 87,
+    "fused": 71,
+    "reader": 71,
+    "verdict": null
+   },
+   {
+    "item": "SNACK BAR CHOCOLATE CHERRY 12 CT",
+    "recall": "H-0543-2026",
+    "baseline": 407,
+    "vectors": 366,
+    "fused": 446,
+    "reader": 446,
+    "verdict": null
+   },
+   {
+    "item": "MOZZARELLA CHEESE SHREDDED LMPS 5 LB",
+    "recall": "F-1757-2012",
+    "baseline": 630,
+    "vectors": 335,
+    "fused": 533,
+    "reader": 533,
+    "verdict": null
+   }
+  ]
+ },
+ "notice": {
+  "summary": {
+   "baseline": {
+    "drafts": 4,
+    "rows": 84,
+    "bad_rows": 0,
+    "row_accuracy": 100.0,
+    "invented_figures": 1,
+    "clean_drafts": 3,
+    "median_seconds": 57.9
+   },
+   "new": {
+    "drafts": 4,
+    "rows": 84,
+    "bad_rows": 0,
+    "row_accuracy": 100.0,
+    "invented_figures": 0,
+    "clean_drafts": 4,
+    "median_seconds": 2.9
+   }
+  },
+  "drafts": [
+   {
+    "design": "baseline",
+    "vendor": "Sysco",
+    "trial": 1,
+    "seconds": 62.5,
+    "rows": 23,
+    "wrong_rows": 0,
+    "missing_rows": 0,
+    "invented_figures": 1,
+    "all_ok": false
+   },
+   {
+    "design": "new",
+    "vendor": "Sysco",
+    "trial": 1,
+    "seconds": 3.1,
+    "rows": 23,
+    "wrong_rows": 0,
+    "missing_rows": 0,
+    "invented_figures": 0,
+    "all_ok": true,
+    "wording_flags": 0
+   },
+   {
+    "design": "baseline",
+    "vendor": "US Foods",
+    "trial": 1,
+    "seconds": 53.3,
+    "rows": 19,
+    "wrong_rows": 0,
+    "missing_rows": 0,
+    "invented_figures": 0,
+    "all_ok": true
+   },
+   {
+    "design": "new",
+    "vendor": "US Foods",
+    "trial": 1,
+    "seconds": 2.9,
+    "rows": 19,
+    "wrong_rows": 0,
+    "missing_rows": 0,
+    "invented_figures": 0,
+    "all_ok": true,
+    "wording_flags": 0
+   },
+   {
+    "design": "baseline",
+    "vendor": "Sysco",
+    "trial": 2,
+    "seconds": 62.8,
+    "rows": 23,
+    "wrong_rows": 0,
+    "missing_rows": 0,
+    "invented_figures": 0,
+    "all_ok": true
+   },
+   {
+    "design": "new",
+    "vendor": "Sysco",
+    "trial": 2,
+    "seconds": 2.9,
+    "rows": 23,
+    "wrong_rows": 0,
+    "missing_rows": 0,
+    "invented_figures": 0,
+    "all_ok": true,
+    "wording_flags": 0
+   },
+   {
+    "design": "baseline",
+    "vendor": "US Foods",
+    "trial": 2,
+    "seconds": 53.1,
+    "rows": 19,
+    "wrong_rows": 0,
+    "missing_rows": 0,
+    "invented_figures": 0,
+    "all_ok": true
+   },
+   {
+    "design": "new",
+    "vendor": "US Foods",
+    "trial": 2,
+    "seconds": 2.8,
+    "rows": 19,
+    "wrong_rows": 0,
+    "missing_rows": 0,
+    "invented_figures": 0,
+    "all_ok": true,
+    "wording_flags": 0
+   }
+  ]
+ }
+}

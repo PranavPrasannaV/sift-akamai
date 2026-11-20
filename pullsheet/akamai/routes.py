@@ -3,6 +3,7 @@
     GET  /ai/second-look   meaning-based neighbours the matcher did not pair
     GET  /ai/notice        the 24-hour distributor notice: explains, offers a button
     POST /ai/notice        drafts one email per distributor and checks every number
+    GET  /ai/benchmark     baseline against the AI techniques, from data/benchmark.json
     GET  /ai/label         photograph a case label
     POST /ai/label         read it with the vision model and look it up
 
@@ -80,6 +81,9 @@ def triage_page(request: Request):
         if run is None:
             return _render(request, "ai_triage.html", {"run": None})
         held, recalls = data.held_lines(conn, run["id"]), data.active_recalls(conn)
+        from pullsheet.matching.run import ordered_matches
+        sheet = [r["id"] for r in ordered_matches(conn, run["id"]) if r["status"] == "HELD"]
+        base_rank = {m: i + 1 for i, m in enumerate(sheet)}
     finally:
         conn.close()
     context = {"run": run, "read_top": semantic.READ_TOP}
@@ -87,11 +91,22 @@ def triage_page(request: Request):
         context["error"] = "Akamai Inference or PostgreSQL is not configured on this server."
         return _render(request, "ai_triage.html", context)
     try:
-        context["result"] = semantic.triage_held(held, recalls)
+        context["result"] = semantic.triage_held(held, recalls, base_rank=base_rank)
     except Exception as error:  # noqa: BLE001 -- the page explains rather than 500s
         log.exception("triage failed")
         context["error"] = _problem(error)
     return _render(request, "ai_triage.html", context)
+
+
+@router.get("/benchmark", response_class=HTMLResponse)
+def benchmark_page(request: Request):
+    """Results written by scripts/benchmark.py: baseline against each technique."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "data" / "benchmark.json"
+    bench = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    return _render(request, "ai_benchmark.html", {"bench": bench})
 
 
 def _pull_context(conn):

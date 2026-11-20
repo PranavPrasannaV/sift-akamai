@@ -10,8 +10,9 @@
     Sift holds a line whenever the evidence is not strong enough to pull it, and never clears one by itself.
     That is safe, and it leaves a long list. This page orders that list. Each held pair is placed by
     meaning: both descriptions are embedded with <code>{{ models.embedding }}</code>, the vectors are stored in
-    Akamai PostgreSQL (pgvector), and their cosine distance is measured in one query. The {{ read_top }} closest
-    pairs are then read by <code>{{ models.chat }}</code>, which answers same, maybe or different and quotes the words
+    Akamai PostgreSQL (pgvector), and their cosine distance is measured in one query. That order is fused with the
+    pull sheet's own rule-based order (reciprocal rank fusion), so a pair either signal ranks high stays near the top.
+    The first {{ read_top }} pairs are then read by <code>{{ models.chat }}</code>, which answers same, maybe or different and quotes the words
     that decide it.
   </p>
 
@@ -48,8 +49,8 @@
     </tbody>
   </table>
 
-  <h2>The other {{ result.rest | length }} held lines, closest in meaning first</h2>
-  <p class="fine">Not read by the model. Ordered by distance only, so the likeliest are still near the top.</p>
+  <h2>The other {{ result.rest | length }} held lines, likeliest first</h2>
+  <p class="fine">Not read by the model. Ordered by the fused rank, so the likeliest are still near the top.</p>
   <table class="lines">
     <thead><tr><th>Inventory line</th><th>Recall</th><th class="num">Distance</th><th></th></tr></thead>
     <tbody>

@@ -64,8 +64,9 @@ Inference (Akamai endpoint, OpenAI-compatible):
   - qwen3-embedding-8b embeds 1,012 recall descriptions and every inventory line
     (4,096 dimensions, into pgvector). Cosine distance orders the held lines by
     how close their meanings are.
-  - qwen3-8-27b reads the closest 36 held pairs and answers same, maybe or
-    different, quoting the words that decide it.
+  - That order is fused with the pull sheet's own rule-based order (reciprocal
+    rank fusion), and qwen3-8-27b reads the first 36 held pairs and answers
+    same, maybe or different, quoting the words that decide it.
   - qwen3-8-27b also writes the wording of one email per distributor: subject,
     opening and closing only. The item table and the requested action are built
     from the database, so the model writes no data.
@@ -97,6 +98,25 @@ Inference (Akamai endpoint, OpenAI-compatible):
     drafts (Sysco, 23 lines; US Foods, 19) passed, in about 4 s.
   - An input the model cannot answer: when nothing close in meaning is left, the
     second-look page says so and adds nothing.
+
+Benchmark (scripts/benchmark.py, live deployment, run 1; page at /ai/benchmark):
+  - The notice, 4 drafts and 84 item rows each, scored by the same checker:
+    - baseline (the model writes the whole email): 57.9 s median per email,
+      1 figure made up, 3 of 4 drafts clean;
+    - new (code writes the data, the model only the wording): 2.9 s median,
+      0 figures made up, 4 of 4 clean, 100% of rows correct.
+  - The held list: 5 planted recalled products are HELD among 814 held lines.
+    Median position (lower is better):
+    - baseline, the pull sheet's own order: 406, 1 in the first 36;
+    - meaning only (pgvector distance): 335, 1 in the first 36;
+    - fused with the sheet order, then read by the model: 71, 2 in the first
+      36, the turkey at #1.
+  - Misses, reported as measured: the model read the carrots pair as
+    "different", so it sits at 28 instead of 7th (still HELD). The snack bar
+    and the mozzarella stay deep; neither signal sees them.
+  - Techniques: split the work by trust; embeddings cached in pgvector;
+    reciprocal rank fusion of rules and meaning; the model reads only the top
+    36 and its verdicts are cached.
 
 Technical choice: Sift's 4,700 lines of hand-written SQL moved to PostgreSQL
   without being rewritten.
@@ -193,6 +213,8 @@ Checks against the real services:
 - `scripts/demo_flow_check.py`: the whole demo.
 - `scripts/triage_check.py`
 - `scripts/ai_smoke.py`
+- `scripts/benchmark.py`: baseline against each technique, written to
+  `data/benchmark.json` and shown at `/ai/benchmark`.
 
 Tests: run `.venv/bin/python -m pytest -q` (SQLite). On Windows,
 `tests/integration/test_network_off.py` fails because it blocks sockets that
@@ -200,9 +222,10 @@ the Windows asyncio loop needs.
 
 ## Demo video
 
-[`demo/sift-akamai-demo.mp4`](demo/sift-akamai-demo.mp4) (3:37) is a live recording of
+[`demo/sift-akamai-demo.mp4`](demo/sift-akamai-demo.mp4) (4:27) is a live recording of
 the deployed app: `scripts/record_demo.py` drives real Chrome against the Linode, and
-draws only the captions and cursor on top. The voiceover script is in
+draws only the captions and cursor on top. The benchmark segment (3:21-4:11) is
+recorded the same way by `scripts/record_benchmark.py`. The voiceover script is in
 [`demo/VOICEOVER.md`](demo/VOICEOVER.md).
 
 ## Where this came from

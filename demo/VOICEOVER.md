@@ -1,4 +1,4 @@
-# Voiceover: Sift on Akamai Cloud (3:37)
+# Voiceover: Sift on Akamai Cloud (4:27)
 
 Read each block when its caption appears on screen. The bold label is the caption's
 small heading, so follow the captions rather than a stopwatch. Times are approximate,
@@ -76,10 +76,25 @@ an easy pace.
 **3:14 A PERSON SENDS IT**
 > Sift drafts it. A person sends it.
 
-**3:21 RUNNING ON AKAMAI CLOUD**
+**3:21 BENCHMARK EVALUATION**
+> Now the benchmark, measured on the live deployment against ground truth.
+
+**3:28 THE NOTICE: BASELINE VS NEW**
+> Baseline: the model writes the whole email. Fifty-eight seconds each, and it made up a figure. Ours takes under three seconds, invents nothing, and every row is correct.
+
+**3:40 THE HELD LIST: BASELINE VS NEW**
+> Five real recalls hide among eight hundred fourteen held lines. In the sheet's own order, they sit at a median of four hundred six. With embeddings, rank fusion and the model's read, it's seventy-one, and the turkey is number one.
+
+**3:50 WHERE IT MISSES**
+> It isn't perfect. The model called the carrots different, so they dropped. But they stay held. A verdict never clears a line.
+
+**4:01 TECHNIQUES APPLIED**
+> The techniques: split the work by trust, keep embeddings in pgvector, fuse the rule order with meaning, and read only the top thirty-six.
+
+**4:11 RUNNING ON AKAMAI CLOUD**
 > All on Akamai: a Linode, managed PostgreSQL with pgvector, Object Storage, and three Akamai Inference models.
 
-**3:29 Closing card**
+**4:19 Closing card**
 > Sift. From the export a kitchen already has, to a pull sheet and a notice, with the evidence for every line attached.
 
 ---
@@ -90,4 +105,4 @@ an easy pace.
   Windows works). Start each block when its caption heading appears.
 - The video has no audio track, so your voice is the only sound.
 - If a block runs long, let it spill into the next scroll shot. The scrolling stretches
-  (0:48-1:05, 1:54-2:15, 3:01-3:13) have the most room.
+  (0:48-1:05, 1:54-2:15, 3:01-3:13, 3:37-3:40) have the most room.

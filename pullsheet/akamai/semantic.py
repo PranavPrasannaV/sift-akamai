@@ -324,8 +324,27 @@ def reviewed_second_look(inventory: list[dict], recalls: list[dict],
 READ_TOP = int(os.environ.get("TRIAGE_READ_TOP", "36"))
 
 
+RRF_K = 60  # reciprocal rank fusion constant (Cormack et al., 2009)
+
+
+def fuse(held: list[dict], base_rank: dict[int, int] | None) -> list[dict]:
+    """Order held pairs by reciprocal rank fusion of two independent signals:
+    Sift's own rule-based sheet order (codes, firm, words) and meaning distance.
+    Each catches matches the other buries; fusion keeps both near the top."""
+    by_vec = sorted(held, key=lambda h: (h["distance"] is None, h["distance"] or 9))
+    vec_rank = {h["match_id"]: i + 1 for i, h in enumerate(by_vec)}
+    if not base_rank:
+        return by_vec
+    worst = len(held) + 1
+
+    def score(h):
+        return 1 / (RRF_K + base_rank.get(h["match_id"], worst)) + 1 / (RRF_K + vec_rank[h["match_id"]])
+
+    return sorted(held, key=lambda h: (-score(h), h["match_id"]))
+
+
 def triage_held(held: list[dict], recalls: list[dict], read_top: int = READ_TOP,
-                batch_size: int = 12, conn=None) -> dict:
+                batch_size: int = 12, conn=None, base_rank: dict[int, int] | None = None) -> dict:
     model = os.environ.get("CHAT_MODEL", "qwen3-8-27b")
     own = conn is None
     conn = conn or _pg()
@@ -350,7 +369,8 @@ def triage_held(held: list[dict], recalls: list[dict], read_top: int = READ_TOP,
         for h in held:
             h["distance"] = dist.get((h["inventory_hash"], h["recall"]["source"],
                                       h["recall"]["source_record_id"]))
-        ordered = sorted(held, key=lambda h: (h["distance"] is None, h["distance"] or 9))
+        ordered = fuse(held, base_rank)
+        fused_pos = {h["match_id"]: i for i, h in enumerate(ordered)}
         top = ordered[:read_top]
         cached = {(ih, s, sid): (v, r) for ih, s, sid, v, r in conn.execute(
             "select inventory_hash, source, source_record_id, verdict, reason from ai_pair_judgements")}
@@ -375,7 +395,7 @@ def triage_held(held: list[dict], recalls: list[dict], read_top: int = READ_TOP,
                       h["verdict"], h["reason"], model) for h in batch])
             conn.commit()
         rank = {"same": 0, "maybe": 1, "different": 2}
-        top.sort(key=lambda h: (rank.get(h.get("verdict"), 1), h["distance"]))
+        top.sort(key=lambda h: (rank.get(h.get("verdict"), 1), fused_pos[h["match_id"]]))
         counts = {v: sum(1 for h in top if h.get("verdict") == v) for v in rank}
         return {"read": top, "rest": ordered[read_top:], "held_total": len(held),
                 "counts": counts, "judged_now": len(todo)}

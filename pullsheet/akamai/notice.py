@@ -69,7 +69,8 @@ def item_table(lines: list[dict]) -> str:
     """The data part of the email, built from the database rows only."""
     head = ("Product", "Item code", "Quantity", "Lot", "Recall", "Recalling firm", "Class")
     rows = [(l["raw_description"], l.get("vendor_item_code") or "none",
-             f"{_fmt_qty(l.get('quantity'))} {l.get('unit') or ''}".strip(),
+             (f"{_fmt_qty(l.get('quantity'))} {l.get('unit') or ''}".strip()
+              if l.get("quantity") is not None else "quantity not recorded"),
              l.get("lot_code") or "not recorded", l["source_record_id"],
              l.get("recalling_firm") or "not named", l.get("classification") or "unclassified")
             for l in lines]
