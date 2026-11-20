@@ -1,0 +1,399 @@
+
+
+/*
+  The letterhead. Paper only.
+
+  Every fact in it except the corpus is already on screen in the masthead, the
+  status line and the stat rail by the time this renders, and on the one page
+  where the rows are the point it cost a quarter of the viewport to say them
+  twice. The corpus and its provenance labels are in the status line on every
+  page, so nothing load-bearing is dropped by hiding this one.
+
+  None of that is true on paper. There is no masthead and no status line there,
+  so this block is the letterhead and it is what makes the printed sheet carry
+  its own provenance out of the building.
+*/
+.headerBlock {
+  display: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-flat);
+  padding: var(--space-3);
+  background: var(--surface-page);
+}
+
+.corpusList {
+  display: grid;
+  gap: 2px;
+}
+
+.corpusEntry {
+  overflow-wrap: anywhere;
+}
+
+.source {
+  font-weight: var(--weight-strong);
+}
+
+.age {
+  color: var(--text-muted);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+}
+
+.staleWord {
+  color: var(--attend-ink);
+  background: var(--attend-tint);
+  padding: 0 var(--space-1);
+  font-weight: var(--weight-strong);
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* A past run states the corpus it was actually matched against, verbatim. */
+.frozenCorpus {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+   Notices: a past run, a refused delivery, a run that produced no line.
+   None of them is an alarm and none of them is a reassurance.
+--------------------------------------------------------------------------- */
+
+.notice {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-flat);
+  background: var(--surface-header);
+  padding: var(--space-3);
+  max-width: 96ch;
+}
+
+.noticeRefused {
+  border: 2px solid var(--alert-outline);
+  background: var(--surface-page);
+}
+
+.noticeHeading {
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--weight-strong);
+  color: var(--text-primary);
+}
+
+.noticeRefused .noticeHeading {
+  color: var(--alert-ink);
+}
+
+.noticeBody {
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+}
+
+.noticeAction {
+  margin-top: var(--space-2);
+}
+
+.reason {
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+   The surface: sheet body on the left, detail pane on the right. The pane
+   pushes the table rather than covering it, because the whole reason to open
+   a line is to compare it against the ones around it.
+--------------------------------------------------------------------------- */
+
+.surface {
+  display: flex;
+  align-items: flex-start;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A caveat under a value in the pane: what the export did not carry, what a
+   decision was recorded against, the lot note the agency published. */
+.note {
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media print {
+  .code {
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }}
+
+/* ---------------------------------------------------------------------------
+   The detail pane. 420px, right side, opaque, one hairline edge, no overlay
+   and no modal: the sheet stays readable beside it.
+--------------------------------------------------------------------------- */
+
+.pane {
+  flex: 0 0 var(--detail-pane-w);
+  position: sticky;
+  top: var(--masthead-h);
+  max-height: calc(100vh - var(--masthead-h));
+  overflow-y: auto;
+  margin-left: var(--space-4);
+  padding: var(--space-3);
+  border-left: 1px solid var(--border-strong);
+  background: var(--surface-page);
+}
+
+.paneHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.paneTitle {
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.paneClose {
+  appearance: none;
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  padding: 1px var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--ls-micro);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.paneSection {
+  padding-top: var(--space-3);
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border-hairline);
+}
+
+.paneSection:first-of-type {
+  border-top: 0;
+}
+
+.paneLabel {
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--ls-micro);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.paneRow {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  gap: var(--space-2);
+  padding: 2px 0;
+}
+
+.paneTerm {
+  font-size: var(--fs-micro);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--ls-micro);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.paneValue {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.paneVerbatim {
+  margin-top: var(--space-2);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.paneChips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+.decision {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.decision:last-child {
+  border-bottom: 0;
+}
+
+.decisionHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.decisionActor {
+  font-weight: var(--weight-strong);
+}
+
+.decisionNote {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.paneLink {
+  margin-top: var(--space-3);
+}
+
+/* ---------------------------------------------------------------------------
+   Footer. What the sheet leaves out, said before anybody has to ask.
+--------------------------------------------------------------------------- */
+
+.footer {
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+  display: grid;
+  gap: var(--space-3);
+  max-width: 108ch;
+}
+
+/* ---------------------------------------------------------------------------
+   Narrow viewports. The pane stops pushing and goes under the sheet rather
+   than squeezing eight columns into nothing.
+--------------------------------------------------------------------------- */
+
+@media (max-width: 1120px) {
+  .surface {
+    flex-direction: column;
+  }
+
+  .pane {
+    position: static;
+    flex: 1 1 auto;
+    width: 100%;
+    max-height: none;
+    margin-left: 0;
+    margin-top: var(--space-4);
+    border-left: 0;
+    border-top: 1px solid var(--border-strong);
+  }}
+
+/* ---------------------------------------------------------------------------
+   Print. Letter portrait, every column intact, every provenance label on the
+   page. The printed sheet is the artefact a health inspector reads, so the
+   header repeats on each page and no row is split across a page break.
+--------------------------------------------------------------------------- */
+
+@media print {
+
+  .surface {
+    display: block;
+  }
+
+  .pane {
+    display: none;
+  }
+
+  .headerBlock {
+    display: block;
+  }
+
+  .headerBlock,
+.notice {
+    border: 1px solid #000000;
+    background: #FFFFFF;
+    break-inside: avoid;
+  }
+
+  .note,
+.code,
+.age {
+    font-size: 7.5pt;
+    line-height: 9.5pt;
+  }
+
+  .footer {
+    break-inside: avoid;
+    border-top: 1px solid #000000;
+  }
+
+  .artifactLinks {
+    display: none;
+  }}
+
+/* The pinned column widths above total 592px. Below that the two unpinned
+   text columns get whatever is left, which on a phone is nothing: the item
+   description rendered one letter per line. The sheet keeps its real column
+   widths and scrolls sideways inside its own body instead, which is what a
+   wide table should do -- the page itself never moves. */
+@media (max-width: 720px) {
+
+  .surface {
+    max-width: 100%;
+  }
+
+  .body {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }}
+/* ---------------------------------------------------------------------------
+   The sections. One folder-tab card per storage location, in the order the
+   API sent them, which is the walking order through the kitchen.
+--------------------------------------------------------------------------- */
+
+.sections {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/*
+  With the detail pane open the sheet has 420px less to work in. The three
+  columns the pane already shows in full step aside rather than squeeze: the
+  lot, the evidence kind, and who recorded the pull.
+*/
+.surface[data-pane="open"] [data-sheet] col:nth-child(3),
+.surface[data-pane="open"] [data-sheet] col:nth-child(4),
+.surface[data-pane="open"] [data-sheet] col:nth-child(6),
+.surface[data-pane="open"] [data-sheet] th:nth-child(3),
+.surface[data-pane="open"] [data-sheet] th:nth-child(4),
+.surface[data-pane="open"] [data-sheet] th:nth-child(6),
+.surface[data-pane="open"] [data-sheet] td:nth-child(3),
+.surface[data-pane="open"] [data-sheet] td:nth-child(4),
+.surface[data-pane="open"] [data-sheet] td:nth-child(6) {
+  display: none;
+}

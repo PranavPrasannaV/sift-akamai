@@ -1,0 +1,47 @@
+{# The provenance macro is defined here and NOWHERE else. Principle V makes the #}
+{% macro provenance(key, captured_at=None) -%}
+<span class="prov prov-{{ label_for(key) | replace(' ', '-') }}" data-provenance="{{ label_for(key) }}"
+      title="How this data got here">{{ label_for(key) }}{% if captured_at %} &middot; captured {{ captured_at[:10] }}{% endif %}</span>
+{%- endmacro %}
+
+{% macro tier_badge(tier, status) -%}
+<span class="badge badge-{{ tier | lower }}" data-status="{{ status }}">{{ tier }}</span>
+{%- endmacro %}
+
+{% macro run_stamp(run) -%}
+<span class="run-stamp">run #{{ run.id }} &middot; {{ run.business_date }} &middot; {{ run.channel | replace('_', ' ') }}</span>
+{%- endmacro %}
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/print.css" media="print">
+<header class="topbar">
+  <a class="brand" href="/">Sift</a>
+  <span class="where">{{ LOCATION.name }}</span>
+  <nav>
+    <a href="/">Today</a>
+    <a href="/sheet">Pull sheet</a>
+    <a href="/impact">Impact</a>
+    <a href="/runs">Run history</a>
+    <a href="/sources">Sources</a>
+    <a href="/ingest">Add inventory</a>
+    <a href="/ai/triage">Held: read first</a>
+    <a href="/ai/second-look">AI second look</a>
+    <a href="/ai/notice">Distributor notice</a>
+    <a href="/ai/label">Check a label</a>
+  </nav>
+</header>
+{% if header and header.stale %}
+<div class="banner banner-stale" role="status">
+  <strong>Recall data is older than 24 hours.</strong>
+  Every line below still stands &mdash; staleness changes this notice, never the sheet.
+  {% for c in header.corpora %}
+    {{ c.source }} captured {{ c.captured_at[:10] }} ({{ c.age_hours }}h ago){% if not loop.last %};{% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{% if header and not header.is_current %}
+<div class="banner banner-past" role="status">
+  <strong>This is run #{{ header.run.id }} from {{ header.run.business_date }}, not today's.</strong>
+  It is shown exactly as it stood, against the recall data it was matched against.
+  <a href="/">Go to the current run</a>.
+</div>
+{% endif %}

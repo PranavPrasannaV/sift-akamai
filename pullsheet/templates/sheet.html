@@ -1,0 +1,62 @@
+{% import "_lines.html" as parts with context %}
+<title>Pull sheet &mdash; {{ header.location.name }}</title>
+{% include "base.html" %}
+
+<main class="sheet">
+  <header class="sheet-header">
+    <h1>Recall pull sheet</h1>
+    <dl>
+      <dt>Location</dt><dd>{{ header.location.name }}</dd>
+      <dt>Operator</dt><dd>{{ header.location.operator }}</dd>
+      <dt>Run</dt>
+      <dd>#{{ header.run.id }} &mdash; inventory of {{ header.run.business_date }},
+        delivered by {{ header.run.channel | replace('_', ' ') }}
+        {%- if not header.is_current %} (superseded){% endif %}</dd>
+      <dt>Generated</dt><dd>{{ header.generated_at }}</dd>
+      <dt>Recall corpus</dt>
+      <dd>{{ parts.corpus_line(header) }}</dd>
+      <dt>Lines</dt>
+      <dd>{{ header.counts.pull_count }} to pull, {{ header.counts.held_count }} held</dd>
+    </dl>
+  </header>
+
+  {% if header.counts.total == 0 %}
+  <section class="zero">
+    <h2>No inventory line matched a recall.</h2>
+    <p>
+      Checked {{ header.run.rows_read }} rows against
+      {% if header.is_current %}{% for c in header.corpora %}{{ c.record_count }}
+      {{ c.source }} records captured {{ c.captured_at[:10] }}{% if not loop.last %} and
+      {% endif %}{% endfor %}{% else %}{{ header.corpus_note }}{% endif %}.
+      A zero-line sheet is a result, not an absence of one &mdash; it means the
+      comparison ran and found nothing, and this page is the record that it ran.
+    </p>
+  </section>
+  {% endif %}
+
+  {{ parts.storage_sections(sections) }}
+
+  <p class="artifact-links">
+    <a href="/artifacts/hold?run={{ header.run.id }}">Hold record</a>
+    &middot; <a href="/artifacts/credit-claim?run={{ header.run.id }}">Credit claim</a>
+    {% if SERVES_MEAL_PROGRAM %}
+    &middot; <a href="/artifacts/state-report?run={{ header.run.id }}">State report</a>
+    &middot; <a href="/impact">Menu impact</a>
+    {% endif %}
+  </p>
+
+  <footer class="sheet-footer">
+    <p class="screening-rule"><strong>What this sheet leaves out.</strong> {{ SCREENING_RULE }}</p>
+    <p class="coverage">
+      Recall code fields parsed: {{ header.coverage.parsed }} of {{ header.coverage.total }}
+      ({{ header.coverage.percent }}%). The remaining {{ header.coverage.unparsed }} carry
+      no machine-readable code, so those records are matched on product name alone
+      and their lines are held rather than pulled.
+    </p>
+    <p class="held-note">
+      Held lines are on this sheet on purpose, interleaved in the same order as
+      pull lines. Nothing on this sheet was cleared automatically; nothing in this
+      system can be.
+    </p>
+  </footer>
+</main>

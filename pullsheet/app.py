@@ -1,0 +1,557 @@
+"""FastAPI routes. Thin -- every route delegates immediately."""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import Form, HTTPException, Request, UploadFile
+from fastapi.applications import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from pullsheet import db, deadlines, location, runs as runs_module, storage
+from pullsheet.adapters.base import DECLARABLE
+from pullsheet.adapters.column_map import ALIASES
+from pullsheet.adapters.spreadsheet_upload import SpreadsheetUploadAdapter
+from pullsheet.artifacts import credit_claim, hold_record, pull_sheet, state_report
+from pullsheet.matching.screen import SCREENING_RULE
+from pullsheet.menu import cascade as menu_cascade
+from pullsheet.menu import substitute as menu_substitute
+from pullsheet.provenance import LABELS, SOURCES, label_for
+from pullsheet.recalls import corpus
+from pullsheet.recalls import fetch as recalls_fetch
+
+ROOT = Path(__file__).resolve().parent.parent
+HERE = Path(__file__).resolve().parent
+UPLOADS = ROOT / "data" / "uploads"
+
+app = FastAPI(title="PullSheet", docs_url=None, redoc_url=None)
+app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+
+# The browser dashboard is served from :3000 and reads the JSON API on :8000.
+# Both loopback spellings, because a browser treats them as different origins.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+templates = Jinja2Templates(directory=str(HERE / "templates"))
+templates.env.globals["label_for"] = label_for
+templates.env.globals["PROVENANCE_LABELS"] = LABELS
+templates.env.globals["SCREENING_RULE"] = SCREENING_RULE
+templates.env.globals["COMPONENTS_CAVEAT"] = menu_substitute.COMPONENTS_CAVEAT
+templates.env.globals["LOCATION"] = location.summary()
+templates.env.globals["SERVES_MEAL_PROGRAM"] = location.serves_meal_program()
+
+
+def now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _conn():
+    return db.connect(db.DB_PATH)
+
+
+def _run_or_404(conn, run_id: int | None = None):
+    """The run named by id, or the latest good one. Both misses are a 404: a
+    location with no inventory is not the same as a location with nothing to
+    pull, and the run lifecycle exists to keep them distinguishable.
+    """
+    run = db.latest_ok_run(conn) if run_id is None else db.get_run(conn, run_id)
+    if run is None:
+        raise HTTPException(404, "no inventory has been ingested yet" if run_id is None
+                            else f"no run {run_id}")
+    return run
+
+
+# The pair a decision is recorded against: this food, this recall notice.
+_SUBJECT_ROW = """SELECT i.identity_key, r.source, r.source_record_id
+                    FROM matches m
+                    JOIN inventory_records i ON i.id = m.inventory_record_id
+                    JOIN recall_records   r ON r.id = m.recall_record_id
+                   WHERE m.id = ?"""
+
+
+def _decided_before(conn, run) -> str | None:
+    """The moment a run's sheet depicts."""
+    nxt = conn.execute(
+        "SELECT started_at FROM runs WHERE status = 'ok' AND id > ? ORDER BY id LIMIT 1",
+        (run["id"],)).fetchone()
+    return nxt["started_at"] if nxt else None
+
+
+# Status
+
+@app.get("/api/status")
+def api_status():
+    """What poll.js reads. Numbers and one word -- it can change no decision."""
+    conn = _conn()
+    try:
+        at = now()
+        status = runs_module.run_status(conn, at)
+        run = status["run"]
+        # All three counts from one place. They used to come from three -- a
+        # COUNT inside run_status, a denormalised column, and run_status again.
+        counts = (pull_sheet.counts(conn, run["id"]) if run else
+                  {"pull_count": 0, "held_count": 0, "new_count": 0})
+        return {
+            "state": status["state"],
+            "word": status["word"],
+            "detail": status["detail"],
+            "run_id": run["id"] if run else None,
+            "business_date": run["business_date"] if run else None,
+            "pull_count": counts["pull_count"],
+            "held_count": counts["held_count"],
+            "new_count": counts["new_count"],
+            "deadlines": deadlines.clocks(conn, run["id"], at) if run else [],
+            "corpus": corpus.corpus_summary(conn, at),
+            "run_count": conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0],
+        }
+    finally:
+        conn.close()
+
+
+# MAIN -- the recall picture
+
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request):
+    """The location on one screen: what to pull, both clocks, what is new today."""
+    conn = _conn()
+    try:
+        at = now()
+        status = runs_module.run_status(conn, at)
+        run = db.latest_ok_run(conn)
+        context = {
+            "request": request,
+            "status": status,
+            "rejections": pull_sheet.rejections(conn),
+            "sources": SOURCES,
+            "run": None,
+        }
+        if run is not None:
+            context.update({
+                "run": dict(run),
+                "header": pull_sheet.header(conn, run, at),
+                "sections": pull_sheet.by_storage(conn, run["id"]),
+                "deadlines": deadlines.clocks(conn, run["id"], at),
+                "new_lines": runs_module.new_since_previous(conn, run["id"]),
+                "previous_run_id": db.previous_ok_run(conn, run["id"]),
+            })
+        return templates.TemplateResponse("dashboard.html", context)
+    finally:
+        conn.close()
+
+
+@app.get("/sheet", response_class=HTMLResponse)
+@app.get("/sheet/{run_id}", response_class=HTMLResponse)
+def sheet(request: Request, run_id: int | None = None):
+    """The printable pull sheet, for the current run or any past one."""
+    conn = _conn()
+    try:
+        run = _run_or_404(conn, run_id or None)
+        before = _decided_before(conn, run)
+        return templates.TemplateResponse("sheet.html", {
+            "request": request,
+            "header": pull_sheet.header(conn, run, now()),
+            "sections": pull_sheet.by_storage(conn, run["id"], before),
+        })
+    finally:
+        conn.close()
+
+
+# RUN HISTORY
+
+@app.get("/runs", response_class=HTMLResponse)
+def run_history(request: Request):
+    """Every run, newest first -- rejected deliveries included."""
+    conn = _conn()
+    try:
+        return templates.TemplateResponse("runs.html", {
+            "request": request,
+            "status": runs_module.run_status(conn, now()),
+            "runs": runs_module.history(conn),
+            "current_run_id": (r["id"] if (r := db.latest_ok_run(conn)) else None),
+        })
+    finally:
+        conn.close()
+
+
+@app.get("/runs/{run_id}", response_class=HTMLResponse)
+def run_detail(request: Request, run_id: int):
+    """One run exactly as it stood: its own lines, its own counts, its own corpus."""
+    conn = _conn()
+    try:
+        run = _run_or_404(conn, run_id)
+        at = now()
+        return templates.TemplateResponse("run_detail.html", {
+            "request": request,
+            "run": dict(run),
+            "header": pull_sheet.header(conn, run, at),
+            "sections": pull_sheet.by_storage(conn, run_id, _decided_before(conn, run)),
+            "new_lines": runs_module.new_since_previous(conn, run_id),
+            "previous_run_id": db.previous_ok_run(conn, run_id),
+            "exports": storage.exports_for_run(run_id),
+            "storage_on": storage.enabled(),
+        })
+    finally:
+        conn.close()
+
+
+# IMPACT -- what the pulls cost
+
+@app.get("/impact", response_class=HTMLResponse)
+def impact(request: Request):
+    """What each pulled case was going to become, what replaces it, and what it
+    is worth. The menu half is a child nutrition surface, shown only where the
+    location runs a meal program; the money half is shown to every kitchen.
+    """
+    conn = _conn()
+    try:
+        run = _run_or_404(conn)
+        at = now()
+        context = {
+            "request": request,
+            "run": dict(run),
+            "header": pull_sheet.header(conn, run, at),
+            "claim": credit_claim.credit_claim(conn, run["id"], at),
+            "menu": None,
+            "proposals": {},
+            "proofs": [],
+        }
+        if location.serves_meal_program():
+            summary = menu_cascade.summary(conn, run["id"])
+            proposals = menu_substitute.proposals_for(conn, run["id"], summary["entries"])
+            context.update({
+                "menu": summary,
+                "proposals": {p["broken_recipe_id"]: p for p in proposals},
+                "proofs": [p for p in proposals if p["kind"] == "none"],
+            })
+        return templates.TemplateResponse("impact.html", context)
+    finally:
+        conn.close()
+
+
+# Compliance artifacts (US3). Each is a read of the same match rows the sheet
+# shows -- none of them can change a line, and none writes anything.
+
+@app.get("/artifacts/hold", response_class=HTMLResponse)
+def artifact_hold(request: Request, run: int | None = None):
+    """FR-043. The custody record, signature fields blank for a human."""
+    conn = _conn()
+    try:
+        row = _run_or_404(conn, run or None)
+        return templates.TemplateResponse("hold_record.html", {
+            "request": request,
+            "header": pull_sheet.header(conn, row, now()),
+            "record": hold_record.hold_record(conn, row["id"], now()),
+        })
+    finally:
+        conn.close()
+
+
+@app.get("/artifacts/credit-claim", response_class=HTMLResponse)
+def artifact_credit_claim(request: Request, run: int | None = None):
+    """FR-046, FR-047. Quantity x unit cost. Nothing estimated, ever."""
+    conn = _conn()
+    try:
+        row = _run_or_404(conn, run or None)
+        return templates.TemplateResponse("credit_claim.html", {
+            "request": request,
+            "header": pull_sheet.header(conn, row, now()),
+            "claim": credit_claim.credit_claim(conn, row["id"], now()),
+        })
+    finally:
+        conn.close()
+
+
+@app.get("/artifacts/state-report", response_class=HTMLResponse)
+def artifact_state_report(request: Request, run: int | None = None):
+    """FR-044, FR-045. Derived fields filled; everything else MARKED, not blank."""
+    conn = _conn()
+    try:
+        if not location.serves_meal_program():
+            raise HTTPException(
+                404, "the state child-nutrition report applies to a school deployment")
+        row = _run_or_404(conn, run or None)
+        return templates.TemplateResponse("state_report.html", {
+            "request": request,
+            "header": pull_sheet.header(conn, row, now()),
+            "report": state_report.state_report(conn, row["id"], now()),
+        })
+    finally:
+        conn.close()
+
+
+@app.get("/sources", response_class=HTMLResponse)
+def sources_page(request: Request):
+    """SC-007, FR-003. Every source, its provenance, and what each adapter can
+    honestly read -- straight from `declares()`, so the page cannot claim a
+    field the adapter does not actually carry.
+    """
+    conn = _conn()
+    try:
+        run = db.latest_ok_run(conn)
+        return templates.TemplateResponse("sources.html", {
+            "request": request,
+            "header": pull_sheet.header(conn, run, now()) if run else None,
+            "sources": SOURCES,
+            "snapshots": corpus.corpus_summary(conn, now()),
+            "adapters": adapter_table(),
+            "declarable": sorted(DECLARABLE),
+        })
+    finally:
+        conn.close()
+
+
+@app.post("/recalls/refresh")
+def refresh_recalls(request: Request):
+    """FR-060. Try the agency; fall back to the cached snapshot on any failure."""
+    conn = _conn()
+    try:
+        result = recalls_fetch.refresh(conn, now=now())
+    finally:
+        conn.close()
+    return JSONResponse(
+        {"status": result["status"], "message": result["message"],
+         "error": result["error"]},
+        status_code=200)
+
+
+@app.get("/match/{match_id}", response_class=HTMLResponse)
+def match_detail(request: Request, match_id: int):
+    """Both source records, verbatim, with the triggering substring highlighted
+    on each side. FR-023, SC-002.
+    """
+    conn = _conn()
+    try:
+        row = conn.execute(MATCH_DETAIL, (match_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, f"no match {match_id}")
+        subject = db.subject_key(row["identity_key"], row["source"], row["source_record_id"])
+        # Every decision about this FOOD and this RECALL, including ones taken
+        # against an earlier run's match row for the same pair: a judgement
+        # survives the next morning's run rather than expiring at midnight.
+        decisions = [dict(d) for d in conn.execute(
+            "SELECT * FROM decisions WHERE subject_key = ? ORDER BY id", (subject,))]
+        run = db.get_run(conn, row["run_id"])
+        return templates.TemplateResponse("match.html", {
+            "request": request,
+            "m": row,
+            "decisions": decisions,
+            "unpopulated": json.loads(row["unpopulated_fields"] or "[]"),
+            "header": pull_sheet.header(conn, run, now()),
+        })
+    finally:
+        conn.close()
+
+
+# Actions
+
+@app.get("/ingest", response_class=HTMLResponse)
+def ingest_page(request: Request, pending: str | None = None):
+    """Upload a spreadsheet by hand, for the morning the scheduled drop fails."""
+    conn = _conn()
+    try:
+        run = db.latest_ok_run(conn)
+        context = {
+            "request": request,
+            "header": pull_sheet.header(conn, run, now()) if run else None,
+            "rejections": pull_sheet.rejections(conn),
+            "pending": None,
+        }
+        if pending:
+            path = UPLOADS / Path(pending).name
+            if path.exists():
+                adapter = SpreadsheetUploadAdapter()
+                headers, mapping, ambiguous = _resolve(conn, adapter, path)
+                context["pending"] = {"filename": path.name, "headers": headers,
+                                      "mapping": mapping, "ambiguous": ambiguous,
+                                      "fields": sorted(ALIASES)}
+        return templates.TemplateResponse("ingest.html", context)
+    finally:
+        conn.close()
+
+
+def _remembered_answers(conn) -> dict[str, str]:
+    """Answers this location has already given about ambiguous headers."""
+    answers: dict[str, str] = {}
+    for row in conn.execute(
+        """SELECT column_map FROM runs
+            WHERE status = 'ok' AND column_map IS NOT NULL ORDER BY id"""):
+        answers.update(json.loads(row["column_map"]))
+    return answers
+
+
+def _resolve(conn, adapter, path):
+    """Detect this file's columns, then fill any ambiguity from memory."""
+    headers, mapping, ambiguous = adapter.inspect(path)
+    remembered = _remembered_answers(conn)
+    for header in list(ambiguous):
+        answer = remembered.get(header)
+        if answer in ambiguous[header]:
+            mapping[header] = answer
+            del ambiguous[header]
+    return headers, mapping, ambiguous
+
+
+@app.post("/ingest/upload")
+async def ingest_upload(file: UploadFile):
+    """Accept a spreadsheet, detect its columns, and ask once if anything is
+    genuinely ambiguous.
+    """
+    UPLOADS.mkdir(parents=True, exist_ok=True)
+    name = Path(file.filename or "upload.csv").name
+    target = UPLOADS / name
+    target.write_bytes(await file.read())
+
+    adapter = SpreadsheetUploadAdapter()
+    conn = _conn()
+    try:
+        try:
+            _headers, mapping, ambiguous = _resolve(conn, adapter, target)
+        except Exception as err:            # noqa: BLE001
+            # A file we cannot even read the headers of is still a delivery
+            # that happened, so it becomes a rejected run: the morning it
+            # arrives is on the record rather than looking like no delivery.
+            run_id = db.open_run(conn, adapter.channel)
+            db.reject_run(conn, run_id, str(err))
+            return RedirectResponse("/ingest", status_code=303)
+        if ambiguous:
+            return RedirectResponse(f"/ingest?pending={name}", status_code=303)
+        result = db.ingest_file(conn, target, adapter, mapping)
+        return RedirectResponse("/" if result["status"] == "ok" else "/ingest",
+                                status_code=303)
+    finally:
+        conn.close()
+
+
+@app.post("/ingest/mapping")
+async def ingest_mapping(request: Request, filename: str = Form(...)):
+    """Store the operator's answer and ingest with it."""
+    form = await request.form()
+    path = UPLOADS / Path(filename).name
+    if not path.exists():
+        raise HTTPException(404, f"{filename} is no longer waiting to be mapped")
+
+    adapter = SpreadsheetUploadAdapter()
+    conn = _conn()
+    try:
+        _headers, mapping, ambiguous = _resolve(conn, adapter, path)
+        for header in ambiguous:
+            chosen = form.get(f"map__{header}")
+            if chosen and chosen != "ignore":
+                mapping[header] = chosen
+        result = db.ingest_file(conn, path, adapter, mapping)
+        return RedirectResponse("/" if result["status"] == "ok" else "/ingest",
+                                status_code=303)
+    finally:
+        conn.close()
+
+
+@app.post("/match/{match_id}/confirm-pulled")
+def confirm_pulled(match_id: int, actor: str = Form("")):
+    """FR-054. A named person says this line has physically been pulled."""
+    if not actor or not actor.strip():
+        raise HTTPException(400, "an actor name is required to confirm a line")
+    conn = _conn()
+    try:
+        row = conn.execute(_SUBJECT_ROW, (match_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, f"no match {match_id}")
+        conn.execute(
+            """INSERT INTO decisions (kind, match_id, subject_key, actor, note, created_at)
+               VALUES ('confirm_pulled', ?, ?, ?, NULL, ?)""",
+            (match_id,
+             db.subject_key(row["identity_key"], row["source"], row["source_record_id"]),
+             actor.strip(), now().isoformat(timespec="seconds")))
+        conn.commit()
+    finally:
+        conn.close()
+    return RedirectResponse(f"/match/{match_id}", status_code=303)
+
+
+@app.post("/match/{match_id}/clear")
+def clear_match(match_id: int, actor: str = Form(""), note: str = Form("")):
+    """Mark a line cleared by a named person.
+
+    ==========================================================================
+    CONSTITUTION PRINCIPLE I -- JUSTIFIED CLEARING PATH 2 OF 3
+    --------------------------------------------------------------------------
+    Requirement:  FR-022. The ONLY route in the system that can mark a line
+                  cleared, and it requires a human actor to do it.
+    Rule:         write a `decisions` row naming the actor. The match itself is
+                  NEVER deleted and never edited -- `matches` has no update path
+                  and no delete path anywhere in the codebase.
+    Why safe:     "cleared" is not a status value; it is the existence of a
+                  decisions row. So clearing is always one join away from a name
+                  and a timestamp, and can never be an absence of data. Nothing
+                  automatic can take this route: it needs a non-empty actor,
+                  which no scheduled process supplies.
+    Scope:        the decision is recorded against the FOOD and the RECALL, not
+                  against tonight's match row, so it survives the next morning's
+                  run instead of quietly expiring at midnight.
+    Covered by:   tests/integration/test_json_api.py
+                  tests/unit/test_clearing_audit.py
+    ==========================================================================
+    """
+    if not actor or not actor.strip():
+        raise HTTPException(400, "an actor name is required to clear a line")
+
+    conn = _conn()
+    try:
+        row = conn.execute(_SUBJECT_ROW, (match_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, f"no match {match_id}")
+        conn.execute(
+            """INSERT INTO decisions (kind, match_id, subject_key, actor, note, created_at)
+               VALUES ('clear_match', ?, ?, ?, ?, ?)""",
+            (match_id,
+             db.subject_key(row["identity_key"], row["source"], row["source_record_id"]),
+             actor.strip(), note.strip() or None,
+             now().isoformat(timespec="seconds")),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return RedirectResponse(f"/match/{match_id}", status_code=303)
+
+
+# The JSON API the browser dashboard reads. Imported last because `api.py`
+# calls back into the two decision writers above; it also carries the match
+# projection the Jinja page shares with the JSON layer.
+from pullsheet.api import MATCH_DETAIL, adapter_table, router as api_router  # noqa: E402
+
+app.include_router(api_router)
+
+
+# Akamai Cloud. Which services this deployment is wired to, checked with one
+# round trip each. Inference reports "configured" because a check spends tokens.
+@app.get("/health")
+def health():
+    import os
+
+    status = {"database": "sqlite (local file)", "object_storage": storage.health(),
+              "inference": "configured" if os.environ.get("AKAMAI_API_KEY") else "not set"}
+    if db.use_postgres():
+        try:
+            conn = db.connect()
+            conn.execute("SELECT 1")
+            conn.close()
+            status["database"] = "akamai postgresql: connected"
+        except Exception as error:  # noqa: BLE001
+            status["database"] = f"error: {str(error).splitlines()[0][:120]}"
+    return status
+
+
+try:  # the AI features (Akamai inference): second look, distributor notice
+    from pullsheet.akamai.routes import router as _ai_router
+    app.include_router(_ai_router)
+except ImportError as _error:  # pragma: no cover
+    import logging
+    logging.getLogger(__name__).warning("AI routes not loaded: %s", _error)

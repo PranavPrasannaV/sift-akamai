@@ -1,0 +1,30 @@
+import type { EvidenceKind as EvidenceKindValue } from "@/lib/types";
+import { EVIDENCE_EXPLANATION, EVIDENCE_LABEL, EVIDENCE_UNKNOWN } from "@/lib/strings";
+import { cx } from "@/lib/cx";
+import styles from "./EvidenceKind.module.css";
+
+function isKnown(kind: string): kind is EvidenceKindValue {
+  return Object.prototype.hasOwnProperty.call(EVIDENCE_LABEL, kind);
+}
+
+/** What agreed, in words. Not a match type and not a quality rating. */
+export function EvidenceKind({ kind, showRaw }: {
+  /** The raw matches.evidence_kind value. Unknown keys are handled. */
+  kind: EvidenceKindValue | string;
+  /** Show the raw key after the label, for a detail pane. */
+  showRaw?: boolean;
+}) {
+  if (!isKnown(kind)) {
+    return (
+      <span className={cx(styles.kind, styles.unknown)} title={EVIDENCE_UNKNOWN}>
+        <code className={styles.raw}>{kind}</code>
+      </span>
+    );
+  }
+  return (
+    <span className={styles.kind} title={EVIDENCE_EXPLANATION[kind]}>
+      {EVIDENCE_LABEL[kind]}
+      {showRaw ? <code className={styles.raw}> {kind}</code> : null}
+    </span>
+  );
+}

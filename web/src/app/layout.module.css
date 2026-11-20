@@ -1,0 +1,18 @@
+.content {
+  margin-left: var(--nav-w);
+  max-width: var(--page-max);
+}
+
+.main {
+  padding: 0 var(--space-6) var(--space-7);
+}
+
+@media (max-width: 720px) {
+  .content {
+    margin-left: 0;
+  }
+
+  .main {
+    padding: 0 var(--space-3) calc(56px + var(--space-6));
+  }
+}

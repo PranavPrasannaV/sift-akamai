@@ -1,0 +1,53 @@
+<title>Distributor notice &mdash; {{ LOCATION.name }}</title>
+{% include "base.html" %}
+{% include "ai_style.html" %}
+
+<main class="ai">
+  <p class="crumb"><a href="/sheet">&larr; pull sheet</a></p>
+  <h1>24-hour distributor notice</h1>
+  <p class="ai-tag">AI-drafted &mdash; checked against the pull sheet, sent by a person.</p>
+  <p class="lede">
+    USDA gives the kitchen 24 hours to tell its distributor. <code>{{ models.chat }}</code>
+    writes one email per distributor from this run's PULL lines. Then every number in the
+    draft is traced back to the database: each line's item code, quantity and lot must
+    appear on the same line of the draft, and any other figure the model wrote is listed below.
+  </p>
+
+  {% if not run %}
+  <p class="zero">No inventory has been received yet.</p>
+  {% elif not lines %}
+  <p class="zero">Run #{{ run.id }} has no PULL lines, so there is nothing to notify.</p>
+  {% else %}
+  <p class="generated">Run #{{ run.id }} &middot; {{ lines | length }} PULL lines &middot;
+    {% for v, g in groups.items() %}{{ v }}: {{ g | length }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+
+  {% if error %}<p class="note-block">Drafting failed: <code>{{ error }}</code></p>{% endif %}
+
+  {% if not notices %}
+  <form method="post" action="/ai/notice" class="door" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Drafting… about a minute'">
+    <button type="submit">Draft the notices</button>
+  </form>
+  {% else %}
+  {% for n in notices %}
+  <section class="ai-notice">
+    <h2>{{ n.vendor }} &mdash; {{ n.lines | length }} lines
+      {% if n.all_ok %}<span class="ai-ok">every number traced</span>
+      {% else %}<span class="ai-warn">check before sending</span>{% endif %}</h2>
+    <pre class="verbatim ai-draft">{{ n.draft }}</pre>
+    <h3>What was checked</h3>
+    <ul class="ai-checks">
+    {% for c in n.checks %}
+      <li class="{{ 'ok' if c.ok else 'bad' }}">{{ '✓' if c.ok else '✗' }}
+        {{ c.line.raw_description }} (item {{ c.line.vendor_item_code or 'none' }}, recall {{ c.line.source_record_id }}): {{ c.what }}</li>
+    {% endfor %}
+    </ul>
+    {% if n.unverified %}
+    <p class="note-block">Figures in the draft that are not in the data: {% for t in n.unverified %}<code>{{ t }}</code> {% endfor %}&mdash; check or delete them.</p>
+    {% else %}
+    <p class="fine">No figure in the draft is missing from the data.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+  {% endif %}
+  {% endif %}
+</main>

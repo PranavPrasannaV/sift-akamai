@@ -1,0 +1,108 @@
+{% import "base.html" as ui with context %}
+<title>Match {{ m.id }} &mdash; Sift</title>
+{% include "base.html" %}
+
+{% macro highlight(text, needle) -%}
+{%- if needle and needle in text -%}
+{{ text[:text.index(needle)] }}<mark>{{ needle }}</mark>{{ text[text.index(needle) + needle|length:] }}
+{%- else -%}
+{{ text }}
+{%- endif -%}
+{%- endmacro %}
+
+<main class="detail">
+  <p class="crumb"><a href="/sheet/{{ m.run_id }}">&larr; pull sheet, run #{{ m.run_id }}</a></p>
+  <h1>{{ ui.tier_badge(m.tier, m.status) }} {{ m.status }} &mdash; {{ m.evidence_kind }} evidence</h1>
+  {% if m.lot_note %}<p class="note note-block">{{ m.lot_note }}</p>{% endif %}
+
+  <div class="sides">
+    <section class="side">
+      <h2>Inventory, as your system wrote it</h2>
+      <p class="verbatim">{{ highlight(m.raw_description, m.trigger_inventory_text) }}</p>
+      <dl>
+        <dt>Storage</dt><dd>{{ m.storage_location or 'not recorded' }}</dd>
+        <dt>Quantity</dt><dd>{% if m.quantity is not none %}{{ m.quantity }} {{ m.unit or '' }}{% else %}not recorded{% endif %}</dd>
+        <dt>Pack size</dt><dd>{{ m.pack_size or 'not recorded' }}</dd>
+        <dt>Barcode</dt><dd>{{ m.gtin or 'none on this row' }}</dd>
+        <dt>Lot</dt><dd>{{ highlight(m.lot_code or 'not tracked', m.trigger_inventory_text) }}</dd>
+        {# Supplier identity (FR-069). Shown next to the barcode and the lot #}
+        <dt>Brand</dt><dd>{{ m.brand or 'not recorded' }}</dd>
+        <dt>Manufacturer</dt><dd>{{ m.manufacturer or 'not recorded' }}</dd>
+        <dt>Mfr item</dt><dd>{{ m.manufacturer_item_code or 'not recorded' }}</dd>
+        <dt>Vendor</dt>
+        <dd>{{ m.vendor_name or 'not recorded' }}{% if m.vendor_item_code %}
+          &middot; {{ m.vendor_item_code }}{% endif %}
+          {# The distributor's own code never appears in an agency notice, so it #}
+        </dd>
+        <dt>Unit cost</dt><dd>{% if m.unit_cost is not none %}${{ '%.2f' | format(m.unit_cost) }}{% else %}not recorded{% endif %}</dd>
+      </dl>
+      {% if unpopulated %}
+      <p class="unpopulated">Fields this export did not carry:
+        {% for f in unpopulated %}<code>{{ f }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+      {% endif %}
+    </section>
+
+    <section class="side">
+      <h2>Recall, as the agency wrote it {{ ui.provenance(m.source) }}</h2>
+      <p class="verbatim">{{ highlight(m.product_description, m.trigger_recall_text) }}</p>
+      <dl>
+        <dt>Record</dt><dd><code>{{ m.source_record_id }}</code> ({{ m.source }})</dd>
+        <dt>Firm</dt><dd>{{ m.recalling_firm or 'not stated' }}</dd>
+        <dt>Class</dt><dd>{{ m.classification or 'unclassified (treated as Class I)' }}</dd>
+        <dt>Status</dt><dd>{{ m.recall_status }}
+          {%- if m.recall_prior_status %} <span class="fine">(was
+            {{ m.recall_prior_status }}{% if m.status_changed_at %},
+            changed {{ m.status_changed_at[:19] }}{% endif %})</span>{% endif %}
+          {%- if m.amended_from %} <span class="fine">amends record
+            #{{ m.amended_from }}</span>{% endif %}</dd>
+        <dt>Reported</dt><dd>{{ m.report_date or 'not stated' }}</dd>
+        <dt>Received here</dt><dd>{{ m.received_at }}</dd>
+        <dt>Reason</dt><dd>{{ m.reason_for_recall or 'not stated' }}</dd>
+        <dt>Code info</dt><dd class="verbatim">{{ highlight(m.code_info or 'none', m.trigger_recall_text) }}</dd>
+      </dl>
+    </section>
+  </div>
+
+  <section class="clearing">
+    <h2>What has been decided about this</h2>
+    {# Decisions are recorded against the FOOD and the RECALL, not against #}
+    {% if decisions %}
+      <ul class="decisions">
+      {% for d in decisions %}
+        <li>
+          {% if d.kind == 'clear_match' %}Cleared{% else %}Confirmed pulled{% endif %}
+          by <strong>{{ d.actor }}</strong> at {{ d.created_at }}
+          {%- if d.note %} &mdash; {{ d.note }}{% endif %}
+          {%- if d.match_id != m.id %} <span class="fine">(recorded on run
+            #{{ d.match_id }}'s line for the same item and recall)</span>{% endif %}
+        </li>
+      {% endfor %}
+      </ul>
+      <p>The line stays on the pull sheet, marked. Nothing is deleted.</p>
+    {% else %}
+      <p class="fine">Nothing yet. This line is on the sheet.</p>
+    {% endif %}
+
+    <div class="two-actions">
+      <form method="post" action="/match/{{ m.id }}/confirm-pulled">
+        <h3>It has been pulled</h3>
+        <p class="fine">Records that somebody walked to the cooler. It does not
+          remove the line from anything &mdash; which is exactly why it is one click.</p>
+        <label>Your name or initials <input name="actor" required placeholder="e.g. AS"></label>
+        <button type="submit">Confirm pulled</button>
+      </form>
+
+      <form method="post" action="/match/{{ m.id }}/clear">
+        <h3>It is not this product</h3>
+        <p class="fine">Marks the line cleared. This is the only action in the
+          system that can do that, and it requires a name.</p>
+        <label>Your name or initials <input name="actor" required placeholder="e.g. AS"></label>
+        <label>Why <input name="note" placeholder="e.g. our lot is 4471, the recall is 4470"></label>
+        <button type="submit">Clear this line</button>
+      </form>
+    </div>
+    <p class="fine">A line can only be cleared by a person who names themselves.
+       No automatic process in this system can take this action, and the clearing
+       survives every future nightly run.</p>
+  </section>
+</main>

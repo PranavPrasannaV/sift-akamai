@@ -1,0 +1,66 @@
+<title>Held lines, read first &mdash; {{ LOCATION.name }}</title>
+{% include "base.html" %}
+{% include "ai_style.html" %}
+
+<main class="ai">
+  <p class="crumb"><a href="/sheet">&larr; pull sheet</a></p>
+  <h1>Held lines: what to read first</h1>
+  <p class="ai-tag">AI reading order &mdash; a person decides. Every line here stays HELD until someone clears it on its match page.</p>
+  <p class="lede">
+    Sift holds a line whenever the evidence is not strong enough to pull it, and never clears one by itself.
+    That is safe, and it leaves a long list. This page orders that list. Each held pair is placed by
+    meaning: both descriptions are embedded with <code>{{ models.embedding }}</code>, the vectors are stored in
+    Akamai PostgreSQL (pgvector), and their cosine distance is measured in one query. The {{ read_top }} closest
+    pairs are then read by <code>{{ models.chat }}</code>, which answers same, maybe or different and quotes the words
+    that decide it.
+  </p>
+
+  {% if not run %}
+  <p class="zero">No inventory has been received yet, so nothing is held.</p>
+  {% elif error %}
+  <p class="note-block">The reading order could not be built: <code>{{ error }}</code>.
+    The pull sheet is unaffected; it never depends on this page.</p>
+  {% elif result %}
+  <p class="generated">Run #{{ run.id }} &middot; {{ result.held_total }} held lines &middot;
+    {{ result.read | length }} read by the model{% if result.judged_now %} ({{ result.judged_now }} just now, the rest cached){% endif %}</p>
+  <div class="tally">
+    <div class="stat stat-held"><span class="n">{{ result.counts.same }}</span> read as the same product</div>
+    <div class="stat"><span class="n">{{ result.counts.maybe }}</span> maybe</div>
+    <div class="stat"><span class="n">{{ result.counts.different }}</span> read as different (still held)</div>
+  </div>
+
+  <table class="lines">
+    <thead><tr><th>AI reading</th><th>Inventory line</th><th>Recall</th><th class="num">Distance</th><th>Why</th><th></th></tr></thead>
+    <tbody>
+    {% for h in result.read %}
+      <tr class="line-held">
+        <td><span class="ai-verdict ai-{{ h.verdict }}">{{ h.verdict }}</span></td>
+        <td>{{ h.item.raw_description }}
+          <div class="supplier">{{ h.item.storage_location or '' }}{% if h.item.manufacturer or h.item.brand %} &middot; {{ h.item.manufacturer or h.item.brand }}{% endif %}</div></td>
+        <td><code>{{ h.recall.source_record_id }}</code> {{ h.recall.classification or 'unclassified' }}
+          <div class="supplier">{{ h.recall.recalling_firm or 'firm not named' }}</div>
+          <div class="fine">{{ (h.recall.product_description or '')[:160] }}</div></td>
+        <td class="num">{{ '%.3f' % h.distance if h.distance is not none else '&mdash;' | safe }}</td>
+        <td class="fine">{{ h.reason }}</td>
+        <td><a href="/match/{{ h.match_id }}">open &rarr;</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>The other {{ result.rest | length }} held lines, closest in meaning first</h2>
+  <p class="fine">Not read by the model. Ordered by distance only, so the likeliest are still near the top.</p>
+  <table class="lines">
+    <thead><tr><th>Inventory line</th><th>Recall</th><th class="num">Distance</th><th></th></tr></thead>
+    <tbody>
+    {% for h in result.rest[:150] %}
+      <tr><td>{{ h.item.raw_description }}</td>
+        <td><code>{{ h.recall.source_record_id }}</code> <span class="fine">{{ (h.recall.product_description or '')[:90] }}</span></td>
+        <td class="num">{{ '%.3f' % h.distance if h.distance is not none else '&mdash;' | safe }}</td>
+        <td><a href="/match/{{ h.match_id }}">open &rarr;</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if result.rest | length > 150 %}<p class="fine">{{ result.rest | length - 150 }} more are on the <a href="/sheet">pull sheet</a>.</p>{% endif %}
+  {% endif %}
+</main>

@@ -1,0 +1,60 @@
+<title>AI second look &mdash; {{ LOCATION.name }}</title>
+{% include "base.html" %}
+{% include "ai_style.html" %}
+
+<main class="ai">
+  <p class="crumb"><a href="/sheet">&larr; pull sheet</a></p>
+  <h1>AI second look</h1>
+  <p class="ai-tag">AI suggestion &mdash; a person decides. Nothing on this page changes the pull sheet.</p>
+  <p class="lede">
+    The matcher pairs lines by supplier, codes and shared product words. This page asks a
+    different question: is there a recall that <em>means</em> the same product but is
+    worded differently? Both descriptions are embedded with <code>{{ models.embedding }}</code>
+    and stored in PostgreSQL (pgvector). Recalls within cosine distance
+    {{ retrieve_distance }} that the matcher did <strong>not</strong> already pair are then
+    read by <code>{{ models.chat }}</code>, which says same, maybe or different and why.
+  </p>
+
+  {% if not run %}
+  <p class="zero">No inventory has been received yet, so there is nothing to look at.</p>
+  {% else %}
+  <p class="generated">Run #{{ run.id }} &middot; {{ inventory_count }} active inventory lines &middot;
+    {{ recall_count }} recall records &middot; {{ pair_count }} pairs already on the sheet</p>
+
+  {% if error %}
+  <p class="note-block">The second look could not run: <code>{{ error }}</code>.
+    The pull sheet is unaffected; it never depends on this page.</p>
+  {% elif result %}
+  <div class="tally">
+    <div class="stat"><span class="n">{{ result.retrieved }}</span> close in meaning, not on the sheet</div>
+    <div class="stat stat-held"><span class="n">{{ result.suggestions | length }}</span> worth a person's look</div>
+    <div class="stat"><span class="n">{{ result.dismissed }}</span> read as a different product</div>
+  </div>
+
+  {% if result.suggestions %}
+  <table class="lines">
+    <thead><tr><th>AI reading</th><th>Inventory line</th><th>Recall</th><th class="num">Distance</th><th>Why</th></tr></thead>
+    <tbody>
+    {% for s in result.suggestions %}
+      <tr class="line-held">
+        <td><span class="ai-verdict ai-{{ s.verdict }}">{{ s.verdict }}</span></td>
+        <td>{{ s.item.raw_description }}
+          <div class="supplier">{{ s.item.storage_location or '' }}{% if s.item.manufacturer or s.item.brand %} &middot; {{ s.item.manufacturer or s.item.brand }}{% endif %}</div></td>
+        <td><code>{{ s.recall.source_record_id }}</code> {{ s.recall.classification or 'unclassified' }}
+          <div class="supplier">{{ s.recall.recalling_firm or 'firm not named' }}</div>
+          <div class="fine">{{ s.recall.product_description[:160] }}</div></td>
+        <td class="num">{{ '%.3f' % s.distance }}</td>
+        <td class="fine">{{ s.reason }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="zero">The model read every close neighbour and found none that is the same product.
+    Today the matcher's list stands on its own. That is a result: the second look ran.</p>
+  {% endif %}
+  <p class="fine">Vectors and verdicts are cached in PostgreSQL by a hash of the exact text,
+    so tomorrow's run only embeds and reads descriptions it has never seen.</p>
+  {% endif %}
+  {% endif %}
+</main>

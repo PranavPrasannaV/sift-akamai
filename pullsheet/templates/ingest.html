@@ -1,0 +1,75 @@
+<title>Add inventory &mdash; Sift</title>
+{% include "base.html" %}
+
+<main>
+  <h1>Add inventory</h1>
+  <p class="generated">Inventory normally arrives on its own, once a day. These
+     are the doors for the morning it does not.</p>
+
+  {% if pending %}
+  <section class="mapping">
+    <h2>One column needs a decision</h2>
+    <p>We recognised every other column in <code>{{ pending.filename }}</code>.
+       This one could mean two different things, and guessing it would produce a
+       sheet that is confidently wrong. Tell us once and every later delivery on
+       this channel reuses the answer.</p>
+    <form method="post" action="/ingest/mapping">
+      <input type="hidden" name="filename" value="{{ pending.filename }}">
+      {% for header, candidates in pending.ambiguous.items() %}
+      <label class="map-row">
+        <span>Column <code>{{ header }}</code> means</span>
+        <select name="map__{{ header }}">
+          {% for c in candidates %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          <option value="ignore">ignore this column</option>
+        </select>
+      </label>
+      {% endfor %}
+      <button type="submit">Use this mapping</button>
+    </form>
+    <details>
+      <summary>Columns we did recognise</summary>
+      <ul>{% for h, f in pending.mapping.items() %}<li><code>{{ h }}</code> &rarr; {{ f }}</li>{% endfor %}</ul>
+    </details>
+  </section>
+  {% endif %}
+
+  <section class="door">
+    <h2>The scheduled drop &mdash; how this normally works</h2>
+    <p>Your inventory system writes its nightly export to the SFTP folder
+       (<code>data/watched/</code> in this build). It is picked up within a couple
+       of seconds, matched, and finalized into a run, and the file moves to
+       <code>data/archive/</code>. A file that could not be read stays put so you
+       can see it, and the refusal is recorded as a run rather than swallowed.</p>
+    <p class="fine">A file is left alone for two seconds after its last write, so a
+       half-uploaded export is never read as a short one. The same delivery
+       arriving twice is recognised and refused rather than double-counted.</p>
+  </section>
+
+  <section class="door">
+    <h2>Emailed export</h2>
+    <p>An export mailed as an attachment lands in the same place and becomes the
+       same kind of run, labelled <code>email drop</code> so it is obvious on the
+       <a href="/runs">run history</a> which channel a day's inventory came in on.</p>
+  </section>
+
+  <section class="door">
+    <h2>Upload a spreadsheet by hand</h2>
+    <p>For the morning the scheduled drop does not arrive. It produces exactly the
+       same kind of run, labelled <code>spreadsheet upload</code>.</p>
+    <form method="post" action="/ingest/upload" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv,.xlsx,.xlsm" required>
+      <button type="submit">Upload</button>
+    </form>
+  </section>
+
+  {% if rejections %}
+  <section class="rejections">
+    <h2>Deliveries that were refused</h2>
+    <ul>{% for r in rejections %}<li><code>{{ r.delivery_ref or 'unnamed delivery' }}</code>
+      ({{ r.channel | replace('_', ' ') }}, {{ r.started_at[:16] }})
+      &mdash; {{ r.rejection_reason }}</li>{% endfor %}</ul>
+    <p class="fine">Each of these is a run in the <a href="/runs">history</a>. The
+      last accepted run stayed in force through every one of them.</p>
+  </section>
+  {% endif %}
+</main>

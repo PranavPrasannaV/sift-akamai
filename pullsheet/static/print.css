@@ -1,0 +1,52 @@
+/* Letter portrait. Every column has to survive the printer, because the sheet's
+   real destination is a clipboard in a walk-in freezer, not a screen. */
+@page { size: letter portrait; margin: 0.5in; }
+
+.topbar, .clearing form, .two-actions, .crumb, nav { display: none !important; }
+
+body { background: #fff; font-size: 9.5pt; }
+main { max-width: none; padding: 0; }
+h1 { font-size: 14pt; }
+h2 { font-size: 11pt; }
+
+table { font-size: 8.5pt; width: 100%; table-layout: fixed; }
+th, td { padding: .12rem .2rem; word-wrap: break-word; overflow-wrap: anywhere; }
+.lines th:nth-child(1), .lines td:nth-child(1) { width: 9%; }
+.lines th:nth-child(2), .lines td:nth-child(2) { width: 24%; }
+.lines th:nth-child(3), .lines td:nth-child(3) { width: 7%; }
+.lines th:nth-child(4), .lines td:nth-child(4) { width: 10%; }
+.lines th:nth-child(5), .lines td:nth-child(5) { width: 9%; }
+.lines th:nth-child(6), .lines td:nth-child(6) { width: 9%; }
+.lines th:nth-child(7), .lines td:nth-child(7) { width: 26%; }
+.lines th:nth-child(8), .lines td:nth-child(8) { width: 6%; }
+
+/* Storage sections start on a clean break, so the freezer walk and the dry-store
+   walk are two handouts and two people can do them at once. */
+.storage-section { break-before: page; break-inside: auto; }
+.storage-section:first-of-type { break-before: auto; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+
+/* Provenance labels and the capture date PRINT. Principle V is not a
+   screen-only commitment: the printed sheet is the artifact that ends up in a
+   compliance folder, and it has to say where its data came from. */
+.prov { border: 1px solid #000 !important; color: #000 !important;
+        background: transparent !important; -webkit-print-color-adjust: exact;
+        print-color-adjust: exact; }
+.badge { color: #000 !important; background: transparent !important;
+         border: 1px solid #000; }
+.line-held { background: #f0f0f0 !important; -webkit-print-color-adjust: exact;
+             print-color-adjust: exact; }
+.line-held td:first-child::after { content: " \25C6"; }
+.line-pull td:first-child::before { content: "\25A0 "; }
+.sheet-footer { break-inside: avoid; border-top: 1.5pt solid #000; font-size: 8pt; }
+
+/* Artifact navigation is screen furniture; the paperwork itself prints. */
+.artifact-links { display: none !important; }
+.rule { min-width: 18rem; border-bottom: 1px solid #000; }
+.sig-line { margin: 1.4rem 0 0; }
+
+/* The verdict word prints. A sheet that reads "3 items to pull" at the
+   top is a sheet an operator can act on without the screen. */
+.verdict .word { font-size: 13pt; font-weight: 700; }
+.whats-new, .clocks { break-inside: avoid; }

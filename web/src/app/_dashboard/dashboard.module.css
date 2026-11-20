@@ -1,0 +1,744 @@
+/* ---------------------------------------------------------------------------
+   Today. One figure, two clocks, three columns, and a bar to drop the next
+   export into. Structure is space and shape; there are no rules.
+--------------------------------------------------------------------------- */
+
+/* ---- hero ---------------------------------------------------------------- */
+
+.hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-2) 0 var(--space-5);
+}
+
+.figureBlock {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.figure {
+  font-size: 84px;
+  line-height: 84px;
+  letter-spacing: -0.04em;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--text-primary);
+}
+
+.figure[data-state="action"],
+.figure[data-state="overdue"],
+.figure[data-state="rejected"] {
+  color: var(--alert-ink);
+}
+
+.word {
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.stale {
+  color: var(--attend-ink);
+}
+
+.staleText {
+  color: var(--attend-ink);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  text-decoration: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.pillPrimary {
+  background: var(--green-800);
+  color: var(--text-inverse);
+  font-weight: var(--weight-strong);
+}
+
+.pillSecondary {
+  background: var(--alert-fill);
+  color: var(--text-inverse);
+  font-weight: var(--weight-strong);
+}
+
+.pillAlert {
+  background: var(--alert-tint);
+  color: var(--alert-ink);
+}
+
+.roundAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-round);
+  background: var(--surface-control);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.pill:focus-visible,
+.roundAction:focus-visible,
+.checkbox:focus-visible,
+.lineMore:focus-visible,
+.tabsPill:focus-visible,
+.docCard:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- stage bar ----------------------------------------------------------- */
+
+.stage {
+  padding-bottom: var(--space-6);
+}
+
+.stageHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+}
+
+.stageDate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+}
+
+.segments {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.segment {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-inner);
+  font-size: var(--fs-body);
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.segment > svg {
+  margin-left: auto;
+  flex: none;
+}
+
+.segmentText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.segmentLeft {
+  color: inherit;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.segmentDone {
+  background: var(--green-800);
+  color: var(--text-inverse);
+}
+
+/* The clock that is running: a tint with its ink on it, the same treatment as
+   a HELD chip, so it is the soft version of "attend" rather than a solid. */
+.segmentCurrent {
+  background: var(--attend-tint);
+  color: var(--attend-ink);
+}
+
+/* Not yet started: a hatch, not a fill. The only pattern on the screen. */
+.segmentLater {
+  color: var(--text-secondary);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--surface-control) 0 2px,
+    var(--surface-page) 2px 6px
+  );
+}
+
+.segmentAlert {
+  background: var(--alert-fill);
+  color: var(--text-inverse);
+}
+
+/* ---- the three columns --------------------------------------------------- */
+
+.body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.side {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* A folder-tab card: the heading is a tab that grows out of the card's top
+   left, and the card's top-left corner is square where the tab meets it. */
+
+.tabCard {
+  display: grid;
+}
+
+.tabHead {
+  display: flex;
+  align-items: flex-end;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  font-size: var(--fs-body);
+  font-weight: var(--weight-strong);
+}
+
+.tabBody {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  border-radius: 0 var(--radius-card) var(--radius-card) var(--radius-card);
+}
+
+.tonePlain .tab,
+.tonePlain .tabBody {
+  background: var(--surface-card);
+  color: var(--text-primary);
+}
+
+.toneAccent .tab,
+.toneAccent .tabBody {
+  background: var(--card-accent);
+  color: var(--card-accent-ink);
+}
+
+.kv {
+  display: grid;
+  gap: 2px;
+}
+
+.kvTerm {
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  opacity: 0.66;
+}
+
+.kvValue {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+
+/* ---- lines --------------------------------------------------------------- */
+
+.lines {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.tabsFolder {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font-weight: var(--weight-strong);
+  margin-right: var(--space-2);
+}
+
+.tabsPill {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  margin-bottom: 2px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tabsPillActive {
+  background: var(--text-primary);
+  color: var(--text-inverse);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.groupTitle {
+  font-size: 26px;
+  line-height: 32px;
+  letter-spacing: -0.01em;
+  font-weight: var(--weight-normal);
+  color: var(--text-primary);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.lineRow {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+/* The gutter is a timeline: the recall class in a circle on a rule that runs
+   from card to card, and under it where the case is. */
+.gutter {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  align-self: stretch;
+}
+
+.gutter::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: calc(-1 * var(--space-3));
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+}
+
+.lineRow:last-child .gutter::before {
+  bottom: auto;
+  height: var(--space-2);
+}
+
+.gutterDot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-round);
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  font-size: var(--fs-micro);
+  font-weight: var(--weight-strong);
+}
+
+.gutterDot[data-rank="1"] {
+  background: var(--alert-tint);
+  color: var(--alert-ink);
+}
+
+.gutterLabel {
+  position: relative;
+  padding: 0 2px;
+  background: var(--surface-page);
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lineCard {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 28px;
+  grid-template-areas:
+    "box title chip more"
+    "box meta  chip more";
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  align-items: center;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+.checkbox {
+  grid-area: box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: var(--radius-chip);
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-inverse);
+  align-self: center;
+  cursor: pointer;
+}
+
+.checkbox:disabled {
+  cursor: progress;
+}
+
+.lineCardDone .lineTitle {
+  color: var(--text-secondary);
+}
+
+/* The one question the box can ask: whose name goes on the record. */
+.lineAsk {
+  grid-area: meta;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.lineAskInput {
+  height: 28px;
+  width: 160px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-inner);
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-body);
+}
+
+.lineAskButton,
+.lineAskCancel {
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--fs-micro);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.lineAskButton {
+  background: var(--green-800);
+  color: var(--text-inverse);
+}
+
+.lineAskCancel {
+  background: var(--surface-control);
+  color: var(--text-secondary);
+}
+
+.lineFailed {
+  color: var(--alert-ink);
+  white-space: normal;
+}
+
+.checkboxDone {
+  background: var(--green-800);
+  border-color: var(--green-800);
+}
+
+.lineTitle {
+  grid-area: title;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lineChip {
+  grid-area: chip;
+  align-self: center;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-chip);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* The chip carries the tier word, so it takes the tier's colour. Confirmed is
+   the terracotta that means act now; probable the ochre that means unresolved;
+   possible stays quiet, because it is here to be read, not acted on. Which
+   list it sits in already says whether it is a pull or a hold. */
+
+.lineChip[data-tier="CONFIRMED"] {
+  background: var(--alert-fill);
+  color: var(--text-inverse);
+}
+
+.lineChip[data-tier="PROBABLE"] {
+  background: var(--attend-tint);
+  color: var(--attend-ink);
+}
+
+.lineChip[data-tier="POSSIBLE"] {
+  background: var(--surface-control);
+  color: var(--text-secondary);
+}
+
+.lineMore {
+  grid-area: more;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-round);
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.lineMore:hover {
+  background: var(--surface-control);
+  color: var(--text-primary);
+}
+
+.lineMeta {
+  grid-area: meta;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  color: var(--text-muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* One fact and its mark. The last one gives way first when the row is tight. */
+.lineFact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineFact > svg {
+  flex: none;
+  opacity: 0.7;
+}
+
+.lineFact:last-child {
+  flex: 0 1 auto;
+}
+
+.lineDot {
+  width: 3px;
+  height: 3px;
+  margin-right: var(--space-1);
+  border-radius: var(--radius-round);
+  background: var(--border-strong);
+  flex: none;
+}
+
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  text-decoration: none;
+  padding-left: calc(48px + var(--space-3));
+}
+
+.more:hover {
+  color: var(--text-primary);
+}
+
+.empty {
+  padding-left: calc(48px + var(--space-3));
+  color: var(--text-muted);
+}
+
+/* ---- documents ----------------------------------------------------------- */
+
+.docs {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.docTitle {
+  font-size: 26px;
+  line-height: 32px;
+  letter-spacing: -0.01em;
+  font-weight: var(--weight-normal);
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.docCard {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.docHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.docHead > span:first-child {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.docDate {
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  color: var(--text-muted);
+}
+
+.docName {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.docOpen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-round);
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  flex: none;
+}
+
+/* A paper thumbnail, drawn: the document's own figures on a white sheet. */
+.thumb {
+  display: grid;
+  gap: 6px;
+  padding: 12px 12px 14px;
+  border-radius: var(--radius-chip);
+  background: var(--paper);
+  color: var(--paper-ink);
+  border: 1px solid var(--border-hairline);
+}
+
+.thumbBar {
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.02em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--paper-ink);
+}
+
+.thumbLine {
+  font-size: 10px;
+  line-height: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- narrow ------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+
+  .figure {
+    font-size: 64px;
+    line-height: 64px;
+  }
+
+  .segments {
+    flex-wrap: wrap;
+  }
+
+  .segment {
+    flex: 1 1 100% !important;
+  }
+
+  .side {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .actions,
+  .tabs,
+  .lineMore {
+    display: none;
+  }
+}

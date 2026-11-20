@@ -1,0 +1,63 @@
+<title>Read a case label &mdash; {{ LOCATION.name }}</title>
+{% include "base.html" %}
+{% include "ai_style.html" %}
+
+<main class="ai">
+  <h1>Read a case label</h1>
+  <p class="ai-tag">AI transcription &mdash; the recall corpus decides, a person confirms.</p>
+  <p class="lede">
+    Photograph a case in the walk-in or a printed recall notice. <code>{{ models.vision }}</code>
+    copies the product, brand, barcode and lot off the photo. The barcode is then looked up
+    exactly in the recall corpus, and the description is checked by meaning the same way as
+    the AI second look.
+  </p>
+  <form method="post" action="/ai/label" enctype="multipart/form-data" class="door">
+    <input type="file" name="file" accept="image/*" capture="environment" required>
+    <button type="submit">Read it</button>
+  </form>
+  {% if error %}<p class="note-block">{{ error }}</p>{% endif %}
+
+  {% if fields %}
+  <h2>What the model read{% if filename %} from {{ filename }}{% endif %}</h2>
+  <div class="side"><dl>
+    <dt>Product</dt><dd>{{ fields.product or "not visible" }}</dd>
+    <dt>Brand or firm</dt><dd>{{ fields.brand_or_firm or "not visible" }}</dd>
+    <dt>Barcode</dt><dd>{{ fields.upc_or_gtin or "not visible" }}</dd>
+    <dt>Lot</dt><dd>{{ fields.lot or "not visible" }}</dd>
+    <dt>Pack size</dt><dd>{{ fields.pack_size or "not visible" }}</dd>
+  </dl></div>
+
+  <h2>Barcode in the recall corpus</h2>
+  {% if code_hits %}
+  <ul>
+  {% for r in code_hits %}
+    <li class="line-pull"><strong>Exact code match:</strong> <code>{{ r.source_record_id }}</code>
+      {{ r.classification or "unclassified" }} &mdash; {{ r.recalling_firm }} &mdash; {{ r.product_description[:140] }}</li>
+  {% endfor %}
+  </ul>
+  {% elif fields.digits %}
+  <p>No recall in the corpus carries <code>{{ fields.digits }}</code>.</p>
+  {% else %}
+  <p>No barcode was readable, so no exact lookup ran.</p>
+  {% endif %}
+
+  {% if review %}
+  <h2>Close in meaning</h2>
+  {% if review.suggestions %}
+  <table class="lines"><tbody>
+  {% for s in review.suggestions %}
+    <tr class="line-held">
+      <td><span class="ai-verdict ai-{{ s.verdict }}">{{ s.verdict }}</span></td>
+      <td><code>{{ s.recall.source_record_id }}</code> {{ s.recall.recalling_firm }}
+        <div class="fine">{{ s.recall.product_description[:160] }}</div></td>
+      <td class="num">{{ "%.3f" % s.distance }}</td>
+      <td class="fine">{{ s.reason }}</td>
+    </tr>
+  {% endfor %}
+  </tbody></table>
+  {% else %}
+  <p>{{ review.retrieved }} recalls were close in meaning to &ldquo;{{ described }}&rdquo;; the model read each as a different product.</p>
+  {% endif %}
+  {% endif %}
+  {% endif %}
+</main>

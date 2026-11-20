@@ -1,0 +1,53 @@
+/* DESIGN.md: "label/value on one baseline". Stacked, the rail cost 64px of a
+   200px chrome budget for five short numbers. On one baseline it costs 36px
+   and reads as a sentence of figures rather than five boxes. */
+.rail {
+  display: flex;
+  gap: var(--space-6);
+  align-items: stretch;
+  min-height: 36px;
+  background: none;
+  border-top: 0;
+  border-bottom: 1px solid var(--border-hairline);
+  border-radius: var(--radius-flat);
+  font-variant-numeric: tabular-nums lining-nums;
+  overflow-x: auto;
+}
+
+.stat {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-left: 0;
+}
+
+.stat:first-child {
+  border-left: 0;
+  padding-left: var(--page-pad);
+}
+
+.label {
+  font-size: var(--fs-micro);
+  line-height: var(--lh-micro);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--ls-micro);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.value {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-strong);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.clocks {
+  margin-left: auto;
+  padding-right: var(--page-pad);
+}
