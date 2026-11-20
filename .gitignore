@@ -42,3 +42,9 @@ data/uploads/
 .gstack/
 .env
 data/*.db
+demo/raw.webm
+demo/frames/
+demo/cap/
+demo/*.jpg
+demo/*.png
+demo/cuts.json

@@ -39,7 +39,7 @@ Benefit: The inventory export the kitchen already produces becomes a pull sheet
   in seconds: 42 lines to pull, grouped by cooler, Class I first. Then:
   - the 814 held lines arrive in the order to read them;
   - a photo of a case label is checked against the recall corpus;
-  - the distributor notice is drafted with every number traced back to the data.
+  - the distributor notice is drafted with every figure taken from the database.
 
 Services:
   - Linode (Nanode, Seattle) runs two systemd services:
@@ -66,7 +66,9 @@ Inference (Akamai endpoint, OpenAI-compatible):
     how close their meanings are.
   - qwen3-8-27b reads the closest 36 held pairs and answers same, maybe or
     different, quoting the words that decide it.
-  - qwen3-8-27b also writes one email per distributor from the pull lines.
+  - qwen3-8-27b also writes the wording of one email per distributor: subject,
+    opening and closing only. The item table and the requested action are built
+    from the database, so the model writes no data.
   - gemma-4-26b-a4b-it reads a photo of a case label: product, firm, barcode,
     lot.
   Why these models: the embedding model ranks 827 pairs in one SQL query for
@@ -85,10 +87,14 @@ Inference (Akamai endpoint, OpenAI-compatible):
   - The label photo: Gemma read "0 40822 01749 7". An exact barcode lookup found
     recall F-2085-2015, Class I, and the meaning check agreed ("same", distance
     0.066).
-  - The distributor email: a checker compares every number and code in the
-    draft with the pull lines. When we changed one quantity by hand, it caught
-    it. On the live server one draft came back "every number traced" and the
-    other "check before sending". The page shows which.
+  - The distributor email: the item table (product, item code, quantity, lot,
+    recall, firm, class) and the requested action ("holding these cases out of
+    service; please arrange pickup or credit") are written by code from the
+    pull lines. A check then confirms that the model's own wording adds no
+    number, code, product name or action word such as "destroy". With a planted
+    "Please destroy the 12 cases of item 7712001 from FSIS-RC-003-2026", the
+    check flagged the number, both codes and "destroy". On the live server both
+    drafts (Sysco, 23 lines; US Foods, 19) passed, in about 4 s.
   - An input the model cannot answer: when nothing close in meaning is left, the
     second-look page says so and adds nothing.
 
@@ -121,17 +127,17 @@ Demo: On the dashboard, upload data/fixtures/inventory_lincoln.csv with the +
     chickpea dip at the top, out of 827 held lines.
   - Go to /ai/label and upload data/demo/case_label_hummus.png: the barcode
     matches the Class I Sabra recall.
-  - Go to /ai/notice and draft it: the drafts come back with the numbers
-    checked.
+  - Go to /ai/notice and draft it: each email's item table comes from the
+    database, and the model only words the message around it.
   - Go to /files/run/1: the original export opens from Object Storage through
     a presigned linodeobjects.com link that expires in an hour.
 
 Known limits:
   - The AI pages call the model on first view. "Held: read first" took about
-    67 s cold and under 1 s cached. Drafting the notice takes about 60 s. There
+    67 s cold and under 1 s cached. Drafting the notice takes about 4 s. There
     is no background queue yet.
-  - A long notice draft is sometimes flagged "check before sending". A person
-    still sends the email.
+  - The wording check reads for data and action words, not tone. A person
+    still reads and sends the email; Sift never sends it.
   - The FSIS corpus is hand-authored, because FSIS returns 403 to scripts. It is
     labelled that way on every screen.
   - There are no user accounts. The person recording a decision types their
@@ -188,6 +194,13 @@ Checks against the real services:
 Tests: run `.venv/bin/python -m pytest -q` (SQLite). On Windows,
 `tests/integration/test_network_off.py` fails because it blocks sockets that
 the Windows asyncio loop needs.
+
+## Demo video
+
+[`demo/sift-akamai-demo.mp4`](demo/sift-akamai-demo.mp4) (3:37) is a live recording of
+the deployed app: `scripts/record_demo.py` drives real Chrome against the Linode, and
+draws only the captions and cursor on top. The voiceover script is in
+[`demo/VOICEOVER.md`](demo/VOICEOVER.md).
 
 ## Where this came from
 

@@ -82,8 +82,12 @@ def exports_for_run(run_id: int) -> list[dict]:
 
 
 def link(key: str) -> str:
-    return _client().generate_presigned_url(
-        "get_object", Params={"Bucket": _bucket(), "Key": key}, ExpiresIn=LINK_SECONDS)
+    params = {"Bucket": _bucket(), "Key": key}
+    if key.lower().endswith((".csv", ".txt", ".eml")):
+        # Show a text export in the browser rather than downloading it.
+        params["ResponseContentType"] = "text/plain; charset=utf-8"
+        params["ResponseContentDisposition"] = "inline"
+    return _client().generate_presigned_url("get_object", Params=params, ExpiresIn=LINK_SECONDS)
 
 
 def health() -> str:

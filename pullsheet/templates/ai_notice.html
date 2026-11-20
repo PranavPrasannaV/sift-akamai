@@ -5,12 +5,13 @@
 <main class="ai">
   <p class="crumb"><a href="/sheet">&larr; pull sheet</a></p>
   <h1>24-hour distributor notice</h1>
-  <p class="ai-tag">AI-drafted &mdash; checked against the pull sheet, sent by a person.</p>
+  <p class="ai-tag">AI-worded &mdash; the item table comes from the database, and a person sends it.</p>
   <p class="lede">
-    USDA gives the kitchen 24 hours to tell its distributor. <code>{{ models.chat }}</code>
-    writes one email per distributor from this run's PULL lines. Then every number in the
-    draft is traced back to the database: each line's item code, quantity and lot must
-    appear on the same line of the draft, and any other figure the model wrote is listed below.
+    USDA gives the kitchen 24 hours to tell its distributor. Each email is split by what can be
+    trusted to write it. The item table (product, item code, quantity, lot, recall, firm, class) and
+    the requested action are built from this run's PULL lines in the database. <code>{{ models.chat }}</code>
+    writes only the subject, the opening and the closing. Then a check confirms that its wording adds
+    no number, code, product name or instruction of its own.
   </p>
 
   {% if not run %}
@@ -31,10 +32,10 @@
   {% for n in notices %}
   <section class="ai-notice">
     <h2>{{ n.vendor }} &mdash; {{ n.lines | length }} lines
-      {% if n.all_ok %}<span class="ai-ok">every number traced</span>
+      {% if n.all_ok %}<span class="ai-ok">every figure from the database</span>
       {% else %}<span class="ai-warn">check before sending</span>{% endif %}</h2>
     <pre class="verbatim ai-draft">{{ n.draft }}</pre>
-    <h3>What was checked</h3>
+    <h3>Where each part came from</h3>
     <ul class="ai-checks">
     {% for c in n.checks %}
       <li class="{{ 'ok' if c.ok else 'bad' }}">{{ '✓' if c.ok else '✗' }}
@@ -42,9 +43,9 @@
     {% endfor %}
     </ul>
     {% if n.unverified %}
-    <p class="note-block">Figures in the draft that are not in the data: {% for t in n.unverified %}<code>{{ t }}</code> {% endfor %}&mdash; check or delete them.</p>
+    <p class="note-block">The model's wording added: {% for t in n.unverified %}<code>{{ t }}</code> {% endfor %}&mdash; check or delete before sending.</p>
     {% else %}
-    <p class="fine">No figure in the draft is missing from the data.</p>
+    <p class="fine">The model's wording adds no number, code, product name or instruction. Every figure in this email is from the database.</p>
     {% endif %}
   </section>
   {% endfor %}

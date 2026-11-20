@@ -22,6 +22,9 @@ const API = process.env.SIFT_API_INTERNAL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The AI pages wait on a model for up to a few minutes; the default proxy
+  // timeout (30 s) would cut the distributor notice off mid-draft.
+  experimental: { proxyTimeout: 300_000 },
   turbopack: {
     root: import.meta.dirname,
   },

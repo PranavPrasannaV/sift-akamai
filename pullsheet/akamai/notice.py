@@ -1,14 +1,20 @@
-"""Draft the 24-hour distributor notification, then check it against the database.
+"""Draft the 24-hour distributor notification. The model writes no data.
 
 USDA gives a school food authority 24 hours to notify its distributor. The pull
 sheet already holds every fact the notice needs; what takes a manager time is the
-writing. CHAT_MODEL (qwen3-8-27b) writes the prose, one message per distributor.
+writing. So the work is split by what each side can be trusted with:
 
-The model is not trusted with a single number. After drafting, every token in
-the draft that contains a digit is looked up in the rows the draft was written
-from. For each pulled line the checker confirms that its item code appears, and
-that the quantity on the same line of the draft is the quantity in the database.
-Anything it cannot trace is listed for a person, and the page says so.
+- The ITEM TABLE (product, item code, quantity, lot, recall number, firm, class)
+  and the REQUESTED ACTION are built by code, straight from the database rows.
+  They cannot be wrong in a way the database is not.
+- CHAT_MODEL (qwen3-8-27b) writes only the subject line, a short opening and a
+  closing, and is given no product data to repeat.
+- The checker then confirms the model's text adds nothing of its own: no digit,
+  no item, lot or recall code, no product name, and no action word (destroy,
+  discard, return...) that would contradict the fixed request. Anything found is
+  listed and the draft is marked "check before sending".
+
+Nothing is sent. A person reads the email and sends it.
 """
 
 from __future__ import annotations
@@ -21,38 +27,35 @@ from pullsheet.akamai import inference
 
 SYSTEM = (
     "You write short, plain business email for a school kitchen manager. "
-    "No Markdown headings, no bold, no tables. Never invent a number, code, phone number, "
-    "name, or date: use only what you are given. If something is unknown, leave it out."
+    "No Markdown, no lists, no tables. Write no numbers, dates, codes, product names, "
+    "phone numbers or instructions: the item table and the request are added for you."
 )
 
 PROMPT = """/no_think
-Write one email from {location} to the distributor {vendor}, notifying them within the
-USDA 24-hour window that the kitchen has recalled product on hand and is holding it.
-Ask them to arrange pickup or credit and to confirm in writing.
+Write the wording around a recall notification email from {location} to its distributor {vendor}.
+A table of the recalled items and a fixed request are inserted by the system between your
+OPENING and your CLOSING. Do not describe the items or the request yourself.
 
-After a two or three sentence opening, list EVERY item below, one per line, exactly in this form:
-- <description> | item <item code> | <quantity> <unit> | lot <lot> | recall <recall id>
-
-Copy each code, quantity, lot and recall id character for character. End with a one-line
-sign-off from "{location} kitchen manager". Start with a "Subject:" line.
-
-Items ({n}):
-{rows}
+Return exactly three parts, each on its own line, prefixed like this:
+SUBJECT: <a short subject line about a USDA recall notification>
+OPENING: <two short sentences: we are notifying you of recalled product on hand at our kitchen, listed below>
+CLOSING: <one or two sentences thanking them and asking them to reply to confirm>
 """
+
+# Fixed text, written by code. The model never writes the request.
+REQUEST = ("Requested action: we are holding these cases out of service. Please arrange "
+           "pickup or credit, and confirm in writing.")
+
+# Words that would change what the distributor is asked to do.
+ACTION_WORDS = ("destroy", "discard", "dispose", "throw", "dump", "return to", "ship back",
+                "resell", "serve", "use up", "donate", "keep using")
 
 
 def _fmt_qty(q) -> str:
     if q is None:
-        return "quantity not recorded"
+        return "not recorded"
     q = float(q)
     return str(int(q)) if q.is_integer() else f"{q:g}"
-
-
-def _row_text(line: dict) -> str:
-    return (f"- {line['raw_description']} | item {line.get('vendor_item_code') or 'none'} | "
-            f"{_fmt_qty(line.get('quantity'))} {line.get('unit') or ''} | "
-            f"lot {line.get('lot_code') or 'not recorded'} | recall {line['source_record_id']}"
-            f" ({line.get('recalling_firm') or 'firm not named'}, {line.get('classification') or 'unclassified'})")
 
 
 def by_vendor(lines: list[dict]) -> "OrderedDict[str, list[dict]]":
@@ -62,68 +65,80 @@ def by_vendor(lines: list[dict]) -> "OrderedDict[str, list[dict]]":
     return groups
 
 
+def item_table(lines: list[dict]) -> str:
+    """The data part of the email, built from the database rows only."""
+    head = ("Product", "Item code", "Quantity", "Lot", "Recall", "Recalling firm", "Class")
+    rows = [(l["raw_description"], l.get("vendor_item_code") or "none",
+             f"{_fmt_qty(l.get('quantity'))} {l.get('unit') or ''}".strip(),
+             l.get("lot_code") or "not recorded", l["source_record_id"],
+             l.get("recalling_firm") or "not named", l.get("classification") or "unclassified")
+            for l in lines]
+    widths = [max(len(str(r[i])) for r in [head, *rows]) for i in range(len(head))]
+
+    def fmt(r):
+        return "  ".join(str(c).ljust(w) for c, w in zip(r, widths)).rstrip()
+
+    return "\n".join([fmt(head), fmt(tuple("-" * w for w in widths)), *map(fmt, rows)])
+
+
+def _parts(raw: str) -> dict[str, str]:
+    out = {"SUBJECT": "", "OPENING": "", "CLOSING": ""}
+    current = None
+    for line in raw.splitlines():
+        m = re.match(r"\s*\**(SUBJECT|OPENING|CLOSING)\**\s*:\s*(.*)", line, re.I)
+        if m:
+            current = m.group(1).upper()
+            out[current] = m.group(2).strip()
+        elif current and line.strip():
+            out[current] = (out[current] + " " + line.strip()).strip()
+    return out
+
+
 _TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9\-./#]*")
 
 
-def _digit_tokens(text: str) -> list[str]:
-    return [t.rstrip(".,;:)") for t in _TOKEN.findall(text) if any(ch.isdigit() for ch in t)]
-
-
-def verify(draft: str, lines: list[dict], allowed_extra: set[str] = frozenset()) -> dict:
-    """Trace every digit-bearing token in the draft back to the source rows."""
-    known: set[str] = set(allowed_extra)
+def verify_prose(prose: str, lines: list[dict], allowed: set[str]) -> list[str]:
+    """Everything in the model's own words that carries data or an instruction."""
+    found = []
+    for tok in _TOKEN.findall(prose):
+        tok = tok.rstrip(".,;:)")
+        if any(ch.isdigit() for ch in tok) and tok not in allowed:
+            found.append(f"number or code {tok!r}")
+    low = prose.lower()
     for line in lines:
-        for value in line.values():
-            if value is None:
-                continue
-            text = _fmt_qty(value) if isinstance(value, (int, float)) else str(value)
-            known.add(text)
-            known.update(_digit_tokens(text))
-    unverified = sorted({t for t in _digit_tokens(draft) if t not in known})
-
-    draft_lines = draft.splitlines()
-    checks, missing = [], []
-    for line in lines:
-        code = line.get("vendor_item_code")
-        recall_id = line["source_record_id"]
-        anchor = code or recall_id
-        hits = [d for d in draft_lines if anchor and anchor in d and recall_id in d]
-        if not hits:
-            hits = [d for d in draft_lines if anchor and anchor in d]
-        if not hits:
-            missing.append(line)
-            checks.append({"line": line, "ok": False, "what": f"item {anchor} is not in the draft"})
-            continue
-        qty = _fmt_qty(line.get("quantity"))
-        qty_ok = any(qty in _digit_tokens(h) or (qty == "quantity not recorded" and qty in h)
-                     for h in hits)
-        lot = line.get("lot_code")
-        lot_ok = (not lot) or any(lot in h for h in hits)
-        ok = qty_ok and lot_ok
-        what = []
-        what.append(f"quantity {qty} " + ("matches" if qty_ok else "NOT FOUND on this line"))
-        if lot:
-            what.append(f"lot {lot} " + ("matches" if lot_ok else "NOT FOUND on this line"))
-        checks.append({"line": line, "ok": ok, "what": "; ".join(what), "draft_line": hits[0].strip()})
-    return {"checks": checks, "missing": missing, "unverified": unverified,
-            "all_ok": not missing and not unverified and all(c["ok"] for c in checks)}
+        for value in (line.get("vendor_item_code"), line.get("lot_code"), line.get("source_record_id")):
+            if value and str(value).lower() in low:
+                found.append(f"code {value!r}")
+        words = re.findall(r"[a-z]{5,}", (line.get("raw_description") or "").lower())
+        if words and all(w in low for w in words[:2]):
+            found.append(f"product {line['raw_description']!r}")
+    for word in ACTION_WORDS:
+        if re.search(rf"\b{re.escape(word)}\b", low):
+            found.append(f"instruction {word!r}")
+    return sorted(set(found))
 
 
-def draft_for_vendor(vendor: str, lines: list[dict], location: str) -> str:
-    prompt = PROMPT.format(location=location, vendor=vendor, n=len(lines),
-                           rows="\n".join(_row_text(l) for l in lines))
-    return inference.chat(SYSTEM, prompt, max_tokens=300 + 70 * len(lines))
+def draft_for_vendor(vendor: str, lines: list[dict], location: str, allowed: set[str]) -> dict:
+    raw = inference.chat(SYSTEM, PROMPT.format(location=location, vendor=vendor), max_tokens=260)
+    parts = _parts(raw)
+    subject = parts["SUBJECT"] or "USDA recall notification"
+    opening = parts["OPENING"] or "We are notifying you of recalled product on hand at our kitchen."
+    closing = parts["CLOSING"] or "Please reply to confirm."
+    added = verify_prose(" ".join((subject, opening, closing)), lines, allowed)
+    draft = "\n".join([
+        f"Subject: {subject}", "", f"Dear {vendor},", "", opening, "",
+        item_table(lines), "", REQUEST, "", closing, "", f"{location} kitchen manager"])
+    checks = [{"line": l, "ok": True, "what": "row taken from the database, not written by the model"}
+              for l in lines]
+    return {"vendor": vendor, "lines": lines, "draft": draft, "checks": checks, "missing": [],
+            "unverified": added, "all_ok": not added}
 
 
 def draft_notices(lines: list[dict], location: str, today: date | None = None) -> list[dict]:
-    """One drafted and verified email per distributor."""
-    today = today or date.today()
-    allowed = {"24", "24-hour", "48", "48-hour", today.isoformat(), str(today.year),
-               *_digit_tokens(location)}
+    """One email per distributor: database table, fixed request, model-written wording."""
+    allowed = {"24", "24-hour", "USDA"}
     from concurrent.futures import ThreadPoolExecutor
 
     groups = list(by_vendor(lines).items())
     with ThreadPoolExecutor(max_workers=4) as pool:
-        drafts = list(pool.map(lambda vg: draft_for_vendor(vg[0], vg[1], location), groups))
-    return [{"vendor": vendor, "lines": group, "draft": draft, **verify(draft, group, allowed)}
-            for (vendor, group), draft in zip(groups, drafts)]
+        return list(pool.map(lambda vg: draft_for_vendor(vg[0], vg[1], location, allowed), groups))

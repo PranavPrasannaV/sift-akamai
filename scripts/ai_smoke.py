@@ -104,21 +104,16 @@ def main() -> int:
     print({v: len(g) for v, g in groups.items()})
     vendor, group = min(groups.items(), key=lambda kv: len(kv[1]))
     group = group[:6]
-    draft = notice.draft_for_vendor(vendor, group, location.NAME)
-    result = notice.verify(draft, group, {"24", "48"})
-    print(draft)
-    print(f"\nchecks ok: {sum(c['ok'] for c in result['checks'])}/{len(result['checks'])}  "
-          f"missing {len(result['missing'])}  unverified {result['unverified']}")
+    result = notice.draft_for_vendor(vendor, group, location.NAME, {"24", "24-hour", "USDA"})
+    print(result["draft"])
+    table_ok = notice.item_table(group) in result["draft"]
+    print(f"item table built from the database: {table_ok}  model wording added: {result['unverified']}")
 
+    # A model that slips data or an instruction into its own words is caught.
     q = notice._fmt_qty(group[0]["quantity"])
-    code = group[0]["vendor_item_code"]
-    corrupted = "\n".join(
-        l.replace(f"| {q} ", f"| {int(float(q)) + 7} ") if code and code in l else l
-        for l in draft.splitlines())
-    bad = notice.verify(corrupted, group, {"24", "48"})
-    flagged = [c["what"] for c in bad["checks"] if not c["ok"]]
-    print(f"corrupted quantity on item {code}: caught={bool(flagged)}  {flagged[:1]}  "
-          f"unverified {bad['unverified']}")
+    bad = notice.verify_prose(f"Please destroy the {int(float(q)) + 7} cases of item "
+                              f"{group[0]['vendor_item_code']}.", group, {"24"})
+    print(f"planted number, code and 'destroy' in the wording: caught {bad}")
     return 0
 
 
